@@ -80,7 +80,9 @@ class ElasticSource extends DataSource {
 	}
 
 	public function listSources() {
-		
+		$mapping = $this->getMapping();
+		$sources = $this->parseMapping($mapping, true);
+		return $sources;
 	}
 	
 	public function calculate(Model $Model, $func, $params) {
@@ -407,13 +409,17 @@ class ElasticSource extends DataSource {
  * @return array CakePHP schema
  * @author David Kullmann
  */
-	public function parseMapping($mapping = array()) {
+	public function parseMapping($mapping = array(), $sourcesOnly = false) {
 		$schema = array();
 		if (!empty($mapping)) {
 			foreach ($mapping as $index => $types) {
-				foreach ($types as $type => $models) {
-					foreach ($models['properties'] as $alias => $properties) {
-						$schema[$alias] = $properties['properties'];
+				if($sourcesOnly) {
+					$schema = array_merge($schema, array_keys($types));
+				} else {
+					foreach ($types as $type => $models) {
+						foreach ($models['properties'] as $alias => $properties) {
+							$schema[$alias] = $properties['properties'];
+						}
 					}
 				}
 			}
