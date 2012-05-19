@@ -47,6 +47,14 @@ class ElasticSource extends DataSource {
 	protected $_document = array();
 
 /**
+ * Valid operators from DboSource to support
+ *
+ * @var string
+ */
+	protected $_filterOps = array('like', 'ilike', 'or', 'not', 'in', 'between', 'regexp', 'similar to');
+	
+
+/**
  * Constructor, call the parent and setup Http
  *
  * @param array $config 
@@ -62,6 +70,7 @@ class ElasticSource extends DataSource {
 		$request = array('uri' => compact('host', 'port', 'scheme'));
 		$httpConfig = compact('host', 'port', 'request');
 		$this->Http = new HttpSocket($httpConfig);
+		$this->startQuote = $this->endQuote = null;
 	}
 
 /**
@@ -79,10 +88,16 @@ class ElasticSource extends DataSource {
 		return $this->_schema[$Model->alias];
 	}
 
+/**
+ * List the types available for each index
+ *
+ * @return array Array of types - similar to tables in a DB
+ * @author David Kullmann
+ */
 	public function listSources() {
-		$mapping = $this->getMapping();
-		$sources = $this->parseMapping($mapping, true);
-		return $sources;
+		// $mapping = $this->getMapping();
+		// $sources = $this->parseMapping($mapping, true);
+		// return $sources;
 	}
 	
 	public function calculate(Model $Model, $func, $params) {
@@ -132,11 +147,11 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function read(Model $Model, $queryData = array()) {
-		
-		$query = $this->generateQuery($queryData);
+
+		$query = $this->generateQuery($Model, $queryData);
 
 		$results = $this->get($Model->useTable, '_search', $query);
-		
+
 		return $results;
 	}
 	
@@ -312,7 +327,7 @@ class ElasticSource extends DataSource {
  * @return array Array that can be converted to JSON for ElasticSearch
  * @author David Kullmann
  */
-	public function generateQuery($queryData = array()) {
+	public function generateQuery(Model $Model, $queryData = array()) {
 		
 		$queryKeys = array(
 			'conditions' => 'filter',
@@ -322,7 +337,7 @@ class ElasticSource extends DataSource {
 			'order' => 'sort',
 		);
 		
-		$queryData['conditions'] = $this->parseConditions($queryData['conditions']);
+		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
 		
 		$query = array();
 		
@@ -353,12 +368,12 @@ class ElasticSource extends DataSource {
  * @return array Array of filters for ElasticSearch
  * @author David Kullmann
  */
-	public function parseConditions($conditions = array()) {
+	public function parseConditions(Model $Model, $conditions = array()) {
 
 		$filters = array();
 		
 		foreach ($conditions as $key => $value) {
-			$data = $this->_parseKey(trim($key), $value);
+			$data = $this->_parseKey($Model, trim($key), $value);
 			if (!empty($data)) {
 				$filters[] = $data;
 				$data = null;
@@ -375,9 +390,53 @@ class ElasticSource extends DataSource {
  * @return array ElasticSearch compatible filter
  * @author David Kullmann
  */
-	protected function _parseKey($key, $value) {
-		$filter = array('term' => array($key => $value));
+	protected function _parseKey(Model $Model, $key, $value) {
+		
+		$filter = array();
+		
+		$operatorMatch = '/^(((' . implode(')|(', $this->_filterOps);
+		$operatorMatch .= ')\\x20?)|<[>=]?(?![^>]+>)\\x20?|[>=!]{1,3}(?!<)\\x20?)/is';
+		$bound = (strpos($key, '?') !== false || (is_array($value) && strpos($key, ':') !== false));
+
+		if (strpos($key, ' ') === false) {
+			$operator = '=';
+		} else {
+			list($key, $operator) = explode(' ', trim($key), 2);
+
+			if (!preg_match($operatorMatch, trim($operator)) && strpos($operator, ' ') !== false) {
+				$key = $key . ' ' . $operator;
+				$split = strrpos($key, ' ');
+				$operator = substr($key, $split);
+				$key = substr($key, 0, $split);
+			}
+		}
+
+		$type = $Model->getColumnType($key);
+
+		switch ($type) {
+			case 'integer':
+				$filter = $this->range($key, $operator, $value);
+				break;
+			case 'string':
+				$filter = $this->term($key, $operator, $value);
+				break;
+		}
 		return $filter;
+	}
+	
+	public function term($key, $operator, $value) {
+		return array('term' => array($key => $value));
+	}
+	
+	public function range($key, $operator, $value) {
+		$rangeOperators = array(
+			'>=' => 'gte',
+			'>'  => 'gt',
+			'<=' => 'lte',
+			'<'  => 'lt'
+		);
+		$operator = $rangeOperators[$operator];
+		return array('range' => array($key => array($operator => $value)));
 	}
 
 /**
@@ -586,6 +645,9 @@ class ElasticSource extends DataSource {
  */
 	protected function _filterResults($results = array()) {
 		if (!empty($results['hits'])) {
+			foreach($results['hits']['hits'] as &$result) {
+				$result = $result['_source'];
+			}
 			return $results['hits']['hits'];
 		}
 		return $results;
