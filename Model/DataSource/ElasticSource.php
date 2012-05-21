@@ -52,6 +52,13 @@ class ElasticSource extends DataSource {
  * @var string
  */
 	protected $_filterOps = array('like', 'ilike', 'or', 'not', 'in', 'between', 'regexp', 'similar to');
+
+/**
+ * Don't list sources by default, there's still some problems here
+ *
+ * @var boolean
+ */
+	protected $_listSources = false;
 	
 
 /**
@@ -95,9 +102,13 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function listSources() {
-		// $mapping = $this->getMapping();
-		// $sources = $this->parseMapping($mapping, true);
-		// return $sources;
+		$sources = null;
+
+		if ($this->_listSources) {
+			$mapping = $this->getMapping();
+			$sources = $this->parseMapping($mapping, true);
+		}
+		return $sources;
 	}
 	
 	public function calculate(Model $Model, $func, $params) {
@@ -228,7 +239,9 @@ class ElasticSource extends DataSource {
  */
 	public function commit() {
 		$documents = $this->allDocuments();
+
 		$results = $this->bulkIndex($this->_type, $documents);
+
 		$this->reset();
 		return $results;
 	}
@@ -339,6 +352,8 @@ class ElasticSource extends DataSource {
 		
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
 		
+		$queryData['order'] = $this->parseOrder($Model, $queryData);
+
 		$query = array();
 		
 		foreach ($queryKeys as $old => $new) {
@@ -357,7 +372,7 @@ class ElasticSource extends DataSource {
 		$query = compact('query', 'size', 'sort', 'from');
 		
 		$query = Set::filter($query);
-				
+
 		return $query;
 	}
 
@@ -379,7 +394,65 @@ class ElasticSource extends DataSource {
 				$data = null;
 			}
 		}
-		return array('and' => $filters);
+		
+		if (count($filters) > 1) {
+			$filters = array('and' => $filters);
+		} elseif (!empty($filters[0])) {
+			$filters = $filters[0];
+		}
+		
+		return $filters;
+	}
+	
+	public function parseOrder(Model $Model, $query = array()) {
+		
+		$results = array();
+		
+		$order = $query['order'];
+		
+		foreach ($order as $key => $value) {
+			
+			if ($key === 0 && empty($value)) {
+				return false;
+			}
+			
+			$direction = 'asc';
+			
+			if (is_string($value)) {
+			} elseif (is_array($value)) {
+				$field = key($value);
+				$direction = current($value);
+			}
+			
+			if (strpos($field, '.')) {
+				list($alias, $field) = explode('.', $field);
+			} else {
+				$alias = $Model->alias;
+			}
+			
+			if ($alias !== $Model->alias) {
+				$aliasModel = ClassRegistry::init($alias);
+				$type = $aliasModel->getColumnType($field);
+			} else {
+				$type = $Model->getColumnType($field);
+			}
+			
+			switch ($type) {
+				case 'geo_point':
+					$results[] = array(
+						'_geo_distance' => array(
+							implode('.', array($alias, $field)) => array(
+								'lat' => $query['latitude'],
+								'lon' => $query['longitude']
+							),
+							'order' => strtolower($direction)
+						)
+					);
+				default:
+			}
+		}
+		
+		return $results;
 	}
 
 /**
@@ -416,11 +489,12 @@ class ElasticSource extends DataSource {
 		switch ($type) {
 			case 'integer':
 				$filter = $this->range($key, $operator, $value);
-				break;
+				break; 
 			case 'string':
 				$filter = $this->term($key, $operator, $value);
 				break;
 		}
+
 		return $filter;
 	}
 	
@@ -429,6 +503,9 @@ class ElasticSource extends DataSource {
 	}
 	
 	public function range($key, $operator, $value) {
+		if ($operator === '=') {
+			return $this->term($key, $operator, $value);
+		}
 		$rangeOperators = array(
 			'>=' => 'gte',
 			'>'  => 'gt',
@@ -625,6 +702,14 @@ class ElasticSource extends DataSource {
 		}
 		
 		$body = json_decode($response['body']);
+		
+		if (!empty($body->items)) {
+			foreach ($body->items as $item) {
+				if (!empty($item->index->error)) {
+					throw new Exception('ElasticSearch Indexing Error ' . $item->index->error);
+				}
+			}
+		}
 
 		if (!empty($body->error)) {
 			throw new Exception("ElasticSearch Error: " . $body->error . ' Status: ' . $body->status);
