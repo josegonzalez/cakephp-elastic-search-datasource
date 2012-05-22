@@ -348,6 +348,7 @@ class ElasticSource extends DataSource {
 			'page' => 'from',
 			'query' => 'query',
 			'order' => 'sort',
+			'fields' => 'fields'
 		);
 		
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
@@ -369,8 +370,8 @@ class ElasticSource extends DataSource {
 		
 		$query = array($type => compact('query', 'filter'));
 
-		$query = compact('query', 'size', 'sort', 'from');
-		
+		$query = compact('query', 'size', 'sort', 'from', 'fields');
+				
 		$query = Set::filter($query);
 
 		return $query;
@@ -668,7 +669,7 @@ class ElasticSource extends DataSource {
 			$results = $this->_parseResponse($response);
 
 			$results = $this->_filterResults($results);
-
+			
 			return $results;
 		} else {
 			throw new Exception("Method $method does not exist on ElasticSource");
@@ -710,7 +711,7 @@ class ElasticSource extends DataSource {
 				}
 			}
 		}
-
+		
 		if (!empty($body->error)) {
 			throw new Exception("ElasticSearch Error: " . $body->error . ' Status: ' . $body->status);
 		}
@@ -731,7 +732,13 @@ class ElasticSource extends DataSource {
 	protected function _filterResults($results = array()) {
 		if (!empty($results['hits'])) {
 			foreach($results['hits']['hits'] as &$result) {
-				$result = $result['_source'];
+				$tmp = $result['_source'];
+				if (!empty($result['fields'])) {
+					foreach ($result['fields'] as $field => $value) {
+						$tmp[0][$field] = $value;
+					}
+				}
+				$result = $tmp;
 			}
 			return $results['hits']['hits'];
 		}

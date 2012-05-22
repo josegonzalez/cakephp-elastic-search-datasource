@@ -11,6 +11,13 @@ Class IndexableBehavior extends ModelBehavior {
 	);
 
 /**
+ * If performing a _geo_distance query and you want to capture the distance you'll need this field
+ *
+ * @var string
+ */
+	public $distanceField = null;
+
+/**
  * Support for having a geo_point field - just one at the moment
  *
  * @var array
@@ -54,6 +61,13 @@ Class IndexableBehavior extends ModelBehavior {
 			$query = $this->parseGeoQuery($Model, $query);
 			return $query;
 		} elseif ($state === 'after') {
+			foreach ($results as &$result) {
+				foreach ($result[0] as $field => $value) {
+					if ($field === $this->distanceField) {
+						$result[$this->settings[$Model->alias]['geoFields']['alias']]['distance'] = $value;
+					}
+				}
+			}
 			return $results;
 		}
 	}
@@ -84,6 +98,12 @@ Class IndexableBehavior extends ModelBehavior {
 		unset($query['conditions'][$latKey]);
 		unset($query['conditions'][$lngKey]);
 
+		$this->distanceField = sprintf("doc['%s.%s'].distance(%s, %s)", $alias, $geo['location'], $query['latitude'], $query['longitude']);
+
+		$query['fields'] = array(
+			'_source',
+			$this->distanceField
+		);
 		$query['order'] = array($alias.'.'.$geo['location'] => 'ASC');
 
 		return $query;
