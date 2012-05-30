@@ -158,10 +158,18 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function read(Model $Model, $queryData = array()) {
-
 		$query = $this->generateQuery($Model, $queryData);
 
-		$results = $this->get($Model->useTable, '_search', $query);
+		if (is_string($query)) {
+			$api = $query;
+			$query = null;
+		} else {
+			$api = '_search';
+		}
+
+		$this->currentModel = $Model;
+
+		$results = $this->get($Model->useTable, $api, $query);
 
 		return $results;
 	}
@@ -174,6 +182,16 @@ class ElasticSource extends DataSource {
 	public function delete(Model $Model, $conditions = null) {
 		// Not yet implemented
 		throw new Exception('Delete not yet implemented by ElasticSource');	
+	}
+	
+	public function query($method, $params, Model $Model) {
+		if (preg_match('/find(All)?By(.+)/', $method, $matches)) {
+			$type = $matches[1] === 'All' ? 'all' : 'first';
+			$conditions = array( strtolower($matches[2]) => $params );
+			return $Model->find($type, compact('conditions'));
+			
+		}
+		throw new Exception ('Cannot call method ' . $method . ' on ElasticSource');
 	}
 	
 	public function index($type, $id, $document = array()) {
@@ -353,6 +371,10 @@ class ElasticSource extends DataSource {
 		
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
 		
+		if (is_string($queryData['conditions'])) {
+			return $queryData['conditions'];
+		}
+		
 		$queryData['order'] = $this->parseOrder($Model, $queryData);
 
 		$query = array();
@@ -364,7 +386,7 @@ class ElasticSource extends DataSource {
 		
 		$query['query'] = empty($query['query']) ? array('match_all' => new Object()) : $query['query'];
 		
-		$query['type'] = empty($queryData['type']) ? 'filtered' : $queryData['type'];
+		$query['type'] = $this->parseQueryType($query);
 		
 		extract($query);
 		
@@ -375,6 +397,17 @@ class ElasticSource extends DataSource {
 		$query = Set::filter($query);
 
 		return $query;
+	}
+	
+	public function parseQueryType($query) {
+		if (!empty($query['type'])) {
+			return $query['type'];
+		}
+		if (!empty($query['filter'])) {
+			return 'filtered';
+		} else {
+			return 'query_string';
+		}
 	}
 
 /**
@@ -387,19 +420,23 @@ class ElasticSource extends DataSource {
 	public function parseConditions(Model $Model, $conditions = array()) {
 
 		$filters = array();
-		
-		foreach ($conditions as $key => $value) {
-			$data = $this->_parseKey($Model, trim($key), $value);
-			if (!empty($data)) {
-				$filters[] = $data;
-				$data = null;
+		if (!empty($conditions)) {
+			foreach ($conditions as $key => $value) {
+				$data = $this->_parseKey($Model, trim($key), $value);
+				if (!empty($data)) {
+					$filters[] = $data;
+					$data = null;
+				}
 			}
 		}
-		
+
 		if (count($filters) > 1) {
 			$filters = array('and' => $filters);
 		} elseif (!empty($filters[0])) {
 			$filters = $filters[0];
+			if (!empty($filters['term']['id']) && count($filters['term']['id']) === 1) {
+				return $filters['term']['id'][0];
+			}
 		}
 		
 		return $filters;
@@ -446,7 +483,8 @@ class ElasticSource extends DataSource {
 								'lat' => $query['latitude'],
 								'lon' => $query['longitude']
 							),
-							'order' => strtolower($direction)
+							'order' => strtolower($direction),
+							'distance_type' => 'plane'
 						)
 					);
 				default:
@@ -493,6 +531,9 @@ class ElasticSource extends DataSource {
 				break; 
 			case 'string':
 				$filter = $this->term($key, $operator, $value);
+				 break;
+			case 'geo_point':
+				$filter = $this->geo($key, $operator, $value);
 				break;
 		}
 
@@ -516,6 +557,16 @@ class ElasticSource extends DataSource {
 		$operator = $rangeOperators[$operator];
 		return array('range' => array($key => array($operator => $value)));
 	}
+	
+	public function geo($key, $operator, $value) {
+		return array('geo_distance_range' => array(
+			'lte' => $value,
+			$key => array(
+				'lat' => $this->currentModel->latitude,
+				'lng' => $this->currentModel->longitude
+			)
+		));
+	}
 
 /**
  * Find the key for this document
@@ -526,6 +577,9 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _findKey(Model $Model, $document = array()) {
+		if (method_exists($Model, 'key')) {
+			return $Model->key($document);
+		}
 		return !empty($document[$Model->alias][$Model->primaryKey]) ? $document[$Model->alias][$Model->primaryKey] : false;
 	}
 
@@ -738,9 +792,20 @@ class ElasticSource extends DataSource {
 						$tmp[0][$field] = $value;
 					}
 				}
+				if (empty($tmp[$this->currentModel->alias][$this->currentModel->primaryKey])) {
+					$tmp[$this->currentModel->alias][$this->currentModel->primaryKey] = $result['_id'];
+				}
+				
 				$result = $tmp;
 			}
 			return $results['hits']['hits'];
+		}
+		if (!empty($results['_id'])) {
+			$model = $results['_source'];
+			if (empty($model[$this->currentModel->alias][$this->currentModel->primaryKey])) {
+				$model[$this->currentModel->alias][$this->currentModel->primaryKey] = $results['_id'];
+			}
+			return array($model);
 		}
 		return $results;
 	}

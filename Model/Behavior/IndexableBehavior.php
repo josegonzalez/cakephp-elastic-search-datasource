@@ -92,8 +92,8 @@ Class IndexableBehavior extends ModelBehavior {
 			throw new Exception('Cannot perform a geo search without longitude and latitude');
 		}
 
-		$query['latitude']  = $query['conditions'][$latKey];
-		$query['longitude'] = $query['conditions'][$lngKey];
+		$Model->latitude  = $query['latitude']  = $query['conditions'][$latKey];
+		$Model->longitude = $query['longitude'] = $query['conditions'][$lngKey];
 
 		unset($query['conditions'][$latKey]);
 		unset($query['conditions'][$lngKey]);
