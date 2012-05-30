@@ -92,6 +92,12 @@ class ElasticSource extends DataSource {
 			$mapping = $this->getMapping();
 			$this->_schema = $this->parseMapping($mapping);
 		}
+		
+		if (empty($this->_schema[$Model->alias][$Model->primaryKey])) {
+			$this->_schema[$Model->alias][$Model->primaryKey] = array('type' => 'string', 'length' => 255);
+		}
+		
+
 		return $this->_schema[$Model->alias];
 	}
 
@@ -158,6 +164,7 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function read(Model $Model, $queryData = array()) {
+
 		$query = $this->generateQuery($Model, $queryData);
 
 		if (is_string($query)) {
