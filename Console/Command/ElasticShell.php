@@ -1,6 +1,19 @@
 <?php
 App::uses('ConnectionManager', 'Model');
+
 class ElasticShell extends Shell {
+	
+	public $timers = array();
+	
+	public function _startTimer($taskId) {
+		$this->timers[$taskId] = microtime(true);
+	}
+
+	public function _endTimer($taskId) {
+		$time = microtime(true) - $this->timers[$taskId];
+		$this->out(sprintf("\tTask '%s' completed in %.2f seconds", $taskId, $time));
+		return $time;
+	}
 	
 	public function getOptionParser() {
 		$parser = parent::getOptionParser();
@@ -93,6 +106,11 @@ class ElasticShell extends Shell {
 		
 		$records = array();
 		
+		$tasks = array(
+			'mysql' => 'Retrieving MySQL records',
+			'saving' => 'Saving to ElasticSearch'
+		);
+		
 		do {
 			if(!empty($records)) {
 				$record = array_pop($records);
@@ -105,14 +123,19 @@ class ElasticShell extends Shell {
 				$date = $newDate;
 				$conditions = array($this->Model->alias.'.'.$field . ' >=' => $newDate);
 			}
-			
+
+			$this->_startTimer($tasks['mysql']);
 			$records = $this->Model->find('all', compact('conditions', 'limit', 'page', 'order'));
+			$this->_endTimer($tasks['mysql']);
 
 			if (!empty($records)) {
 				
 				$this->Model->create();
 				$this->Model->setDataSource('index');
+				
+				$this->_startTimer($tasks['saving']);
 				$results = $this->Model->saveAll($records, array('deep' => true));
+				$this->_endTimer($tasks['saving']);
 
 				if ($results) {
 					$count = count($records);
