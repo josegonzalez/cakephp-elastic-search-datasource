@@ -28,7 +28,8 @@ Class IndexableBehavior extends ModelBehavior {
 			'longitude' => null,
 			'location' => null,
 			'alias' => null
-		)
+		),
+		'modificationField' => 'modified'
 	);
 	
 /**
@@ -107,6 +108,29 @@ Class IndexableBehavior extends ModelBehavior {
 		$query['order'] = array($alias.'.'.$geo['location'] => 'ASC');
 
 		return $query;
+	}
+	
+	public function lastSync(Model $Model) {
+		list($alias, $field) = $this->getModificationField($Model);
+		$modificationField = $alias.'.'.$field;
+		$fields = array($modificationField);
+		$order = array($modificationField => 'DESC');
+		$conditions = array('NOT' => array($modificationField => NULL));
+		$result = $Model->find('first', compact('fields', 'order', 'conditions'));
+		if (empty($result[$alias][$field])) {
+			$result = '1970-01-01 00:00:00';
+		} else {
+			$result = $result[$alias][$field];
+		}
+		return $result;
+	}
+	
+	public function getModificationField($Model) {
+		$modificationField = $this->settings[$Model->alias]['modificationField'];
+		if (!strpos($modificationField, '.')) {
+			$modificationField = $Model->alias.'.'.$modificationField;
+		}
+		return explode('.', $modificationField);
 	}
 
 }

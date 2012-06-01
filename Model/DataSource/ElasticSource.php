@@ -495,6 +495,7 @@ class ElasticSource extends DataSource {
 						)
 					);
 				default:
+					$results[] = array($alias.'.'.$field => array('order' => strtolower($direction)));
 			}
 		}
 		
@@ -529,22 +530,34 @@ class ElasticSource extends DataSource {
 				$key = substr($key, 0, $split);
 			}
 		}
-
+		
+		if ($key === 'NOT') {
+			$result = $this->parseConditions($Model, $value);
+			return array('not' => $result);
+		}
 		$type = $Model->getColumnType($key);
 
-		switch ($type) {
-			case 'integer':
-				$filter = $this->range($key, $operator, $value);
-				break; 
-			case 'string':
-				$filter = $this->term($key, $operator, $value);
-				 break;
-			case 'geo_point':
-				$filter = $this->geo($key, $operator, $value);
-				break;
+		if ($value === null) {
+			$filter = $this->missing($key, $value);
+		} else {
+			switch ($type) {
+				case 'integer':
+					$filter = $this->range($key, $operator, $value);
+					break; 
+				case 'string':
+					$filter = $this->term($key, $operator, $value);
+					 break;
+				case 'geo_point':
+					$filter = $this->geo($key, $operator, $value);
+					break;
+			}
 		}
 
 		return $filter;
+	}
+	
+	public function missing($key, $value) {
+		return array('missing' => array('field' => $key));
 	}
 	
 	public function term($key, $operator, $value) {
@@ -793,10 +806,15 @@ class ElasticSource extends DataSource {
 	protected function _filterResults($results = array()) {
 		if (!empty($results['hits'])) {
 			foreach($results['hits']['hits'] as &$result) {
-				$tmp = $result['_source'];
+				$tmp = isset($result['_source']) ? $result['_source'] : array();
 				if (!empty($result['fields'])) {
 					foreach ($result['fields'] as $field => $value) {
-						$tmp[0][$field] = $value;
+						if (strpos($field, '.')) {
+							list($alias, $field) = explode('.', $field);
+							$tmp[$alias][$field] = $value;
+						} else {
+							$tmp[0][$field] = $value;
+						}
 					}
 				}
 				if (empty($tmp[$this->currentModel->alias][$this->currentModel->primaryKey])) {

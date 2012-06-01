@@ -77,21 +77,53 @@ class ElasticShell extends Shell {
 		
 		$this->Model = $this->_getModel($model);
 		
+		list($alias, $field) = $this->Model->getModificationField();
+
+		$db = $this->Model->useDbConfig;
+
+		$this->Model->setDataSource('index');
+		$date = $this->Model->lastSync();
+		$this->Model->setDataSource($db);
+		
+		$conditions = array($this->Model->alias.'.'.$field . ' >=' => $date);
+		$this->out('Retrieving data from mysql starting on ' . $date);
+		
+		$order = array($this->Model->alias.'.'.$field => 'ASC');
+		$contain = false;
+		
+		$records = array();
+		
 		do {
+			if(!empty($records)) {
+				$record = array_pop($records);
+				$newDate = $record[$alias][$field];
+				if($newDate === $date) {
+					$page++;
+				} else {
+					$page = 1;
+				}
+				$date = $newDate;
+				$conditions = array($this->Model->alias.'.'.$field . ' >=' => $newDate);
+			}
 			
-			$records = $this->Model->find('all', compact('limit', 'page'));
-			$this->Model->create();
-			$this->Model->setDataSource('index');
-			$results = $this->Model->saveAll($records, array('deep' => true));
-			
-			if ($results) {
-				$this->out("Saved $limit records");
-			} else {
-				$this->out("Unabled to save records (limit: $limit - page: $page)");
+			$records = $this->Model->find('all', compact('conditions', 'limit', 'page', 'order'));
+
+			if (!empty($records)) {
+				
+				$this->Model->create();
+				$this->Model->setDataSource('index');
+				$results = $this->Model->saveAll($records, array('deep' => true));
+
+				if ($results) {
+					$count = count($records);
+					$this->out("Saved $count records starting on $date (page: $page - limit: $limit)");
+				} else {
+					$this->out("Unable to save records (limit: $limit - page: $page)");
+				}
+
 			}
 			
 			$this->Model->setDataSource('default');
-			$page++;
 			
 		} while (!empty($records));
 
