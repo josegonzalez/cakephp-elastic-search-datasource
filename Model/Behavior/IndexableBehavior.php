@@ -110,6 +110,16 @@ Class IndexableBehavior extends ModelBehavior {
 		return $query;
 	}
 	
+	public function index(Model $Model, $documents = array()) {
+		$ds = $Model->getDataSource();
+		$ds->begin();
+		foreach ($documents as $document) {
+			$ds->addToDocument($Model, $document);
+		}
+		$ds->commit();
+		return $documents;
+	}
+	
 	public function lastSync(Model $Model) {
 		list($alias, $field) = $this->getModificationField($Model);
 		$modificationField = $alias.'.'.$field;

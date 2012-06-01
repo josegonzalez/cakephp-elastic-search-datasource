@@ -25,6 +25,7 @@ class ElasticShell extends Shell {
 				->addOption('model', array('help' => 'Model to use','short' => 'm'))
 				->addOption('limit', array('help' => 'Limit for indexing','short' => 'l', 'default' => 100))
 				->addOption('page', array('help' => 'Page to start indexing on','short' => 'p', 'default' => 1))
+				->addOption('fast', array('help' => 'Fast index (dont use saveAll)','short' => 'f', 'default' => false))
 				->addOption('reset', array('help' => 'Also reset the reset the mappings','short' => 'r', 'default' => 0));
 	}
 
@@ -134,7 +135,11 @@ class ElasticShell extends Shell {
 				$this->Model->setDataSource('index');
 				
 				$this->_startTimer($tasks['saving']);
-				$results = $this->Model->saveAll($records, array('deep' => true));
+				if ($fast) {
+					$results = $this->Model->index($records);
+				} else {
+					$results = $this->Model->saveAll($records, array('deep' => true, 'validate' => false));
+				}
 				$this->_endTimer($tasks['saving']);
 
 				if ($results) {
