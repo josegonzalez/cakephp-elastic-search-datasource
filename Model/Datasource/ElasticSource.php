@@ -562,7 +562,13 @@ class ElasticSource extends DataSource {
 	}
 	
 	public function term($key, $operator, $value) {
-		return array('term' => array($key => $value));
+		$type = 'term';
+		if (is_array($value)) {
+			if (count($value) > 1) {
+				$type = 'terms';
+			}
+		}
+		return array($type => array($key => $value));
 	}
 	
 	public function range($key, $operator, $value) {
@@ -584,7 +590,7 @@ class ElasticSource extends DataSource {
 			'lte' => $value,
 			$key => array(
 				'lat' => $this->currentModel->latitude,
-				'lng' => $this->currentModel->longitude
+				'lon' => $this->currentModel->longitude
 			)
 		));
 	}
