@@ -494,6 +494,7 @@ class ElasticSource extends DataSource {
 							'distance_type' => 'plane'
 						)
 					);
+					break;
 				default:
 					$results[] = array($alias.'.'.$field => array('order' => strtolower($direction)));
 			}
@@ -809,7 +810,7 @@ class ElasticSource extends DataSource {
 				$tmp = isset($result['_source']) ? $result['_source'] : array();
 				if (!empty($result['fields'])) {
 					foreach ($result['fields'] as $field => $value) {
-						if (strpos($field, '.')) {
+						if (strpos($field, '.') && strpos($field, 'doc') !== 0) {
 							list($alias, $field) = explode('.', $field);
 							$tmp[$alias][$field] = $value;
 						} else {
