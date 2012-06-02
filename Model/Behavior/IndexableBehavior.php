@@ -111,9 +111,19 @@ Class IndexableBehavior extends ModelBehavior {
 	}
 	
 	public function index(Model $Model, $documents = array()) {
+		$geoFields = !empty($this->settings[$Model->alias]['geoFields']) ? $this->settings[$Model->alias]['geoFields'] : false;
+		if ($geoFields) {
+			extract($geoFields);
+		}
 		$ds = $Model->getDataSource();
 		$ds->begin();
 		foreach ($documents as $document) {
+			if ($geoFields) {
+				$document[$alias][$location] = array(
+					'lat' => $document[$Model->alias][$latitude],
+					'lon' => $document[$Model->alias][$longitude]
+				);
+			}
 			$ds->addToDocument($Model, $document);
 		}
 		$ds->commit();
