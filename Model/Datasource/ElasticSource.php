@@ -375,9 +375,11 @@ class ElasticSource extends DataSource {
 			'order' => 'sort',
 			'fields' => 'fields'
 		);
-		
+
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
 		
+		$queryData['conditions'] = $this->afterParseConditions($Model, $queryData['conditions']);
+
 		if (is_string($queryData['conditions'])) {
 			return $queryData['conditions'];
 		}
@@ -437,15 +439,6 @@ class ElasticSource extends DataSource {
 			}
 		}
 
-		if (count($filters) > 1) {
-			$filters = array('and' => $filters);
-		} elseif (!empty($filters[0])) {
-			$filters = $filters[0];
-			if (!empty($filters['term']['id']) && count($filters['term']['id']) === 1) {
-				return $filters['term']['id'][0];
-			}
-		}
-		
 		return $filters;
 	}
 	
@@ -532,10 +525,18 @@ class ElasticSource extends DataSource {
 			}
 		}
 		
-		if ($key === 'NOT') {
+		if (in_array($key, array('AND', 'OR', 'NOT'))) {
 			$result = $this->parseConditions($Model, $value);
-			return array('not' => $result);
+			if ($key === 'NOT') {
+				if (count($result) === 1) {
+					$result = current($result);
+				} else {
+					$result = array('and' => $result);
+				}
+			}
+			return array(strtolower($key) => $result);
 		}
+
 		$type = $Model->getColumnType($key);
 
 		if ($value === null) {
@@ -543,18 +544,44 @@ class ElasticSource extends DataSource {
 		} else {
 			switch ($type) {
 				case 'integer':
+				case 'date':
 					$filter = $this->range($key, $operator, $value);
 					break; 
+				case 'multi_field':
 				case 'string':
 					$filter = $this->term($key, $operator, $value);
 					 break;
 				case 'geo_point':
 					$filter = $this->geo($key, $operator, $value);
 					break;
+				default:
+					throw new Exception("Unable to process field of type $type");
 			}
 		}
 
 		return $filter;
+	}
+
+/**
+ * Perform this check after parseConditions has completed, since parseConditions is recursive
+ * we have to perform this check in a separate method (or use a static variable or whatever, but,
+ * I think this is cleaner)
+ *
+ * @param string $Model 
+ * @param array $filters 
+ * @return array
+ * @author David Kullmann
+ */	
+	public function afterParseConditions(Model $Model, $filters = array()) {
+		if (count($filters) > 1) {
+			$filters = array('and' => $filters);
+		} elseif (!empty($filters[0])) {
+			$filters = $filters[0];
+			if (!empty($filters['term']['id']) && count($filters['term']['id']) === 1) {
+				return $filters['term']['id'][0];
+			}
+		}
+		return $filters;
 	}
 	
 	public function missing($key, $value) {
