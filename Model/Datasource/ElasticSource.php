@@ -534,8 +534,13 @@ class ElasticSource extends DataSource {
  */
 	protected function _parseKey(Model $Model, $key, $value) {
 
-		if (is_numeric($key) && empty($value)) {
-			return false;
+		if (is_numeric($key)) {
+			if (empty($value)) {
+				return false;
+			} else {
+				$key = key($value);
+				$value = current($value);
+			}
 		}
 
 		$filter = array();
@@ -858,7 +863,7 @@ class ElasticSource extends DataSource {
 				default:
 					$response = call_user_func_array(array(&$this->Http, $method), array($uri, $body));
 			}
-			
+
 			$results = $this->_parseResponse($response);
 			
 			$this->logQuery($method, $uri, $body, $results);
