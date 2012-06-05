@@ -150,7 +150,7 @@ class ElasticSource extends DataSource {
 			throw new Exception('ElasticSource requires a primary key to index a document');
 		}
 		
-		$results = $this->index($Model->useTable, $id, $document);
+		$results = $this->index($this->getType($Model), $id, $document);
 
 		return $results;
 	}
@@ -165,6 +165,8 @@ class ElasticSource extends DataSource {
  */
 	public function read(Model $Model, $queryData = array()) {
 
+		$this->currentModel = $Model;
+
 		$query = $this->generateQuery($Model, $queryData);
 
 		if (is_string($query)) {
@@ -174,9 +176,7 @@ class ElasticSource extends DataSource {
 			$api = '_search';
 		}
 
-		$this->currentModel = $Model;
-
-		$results = $this->get($Model->useTable, $api, $query);
+		$results = $this->get($this->getType($Model), $api, $query);
 
 		return $results;
 	}
@@ -344,7 +344,7 @@ class ElasticSource extends DataSource {
 	protected function _setupTransaction(Model $Model, $document = array()) {
 		
 		$id = $this->_findKey($Model, $document);
-		$type = $Model->useTable;
+		$type = $this->getType($Model);
 		
 		if (empty($this->_type) && empty($this->_id) && $id) {
 			$this->_type = $type;
@@ -590,10 +590,8 @@ class ElasticSource extends DataSource {
 	
 	public function term($key, $operator, $value) {
 		$type = 'term';
-		if (is_array($value)) {
-			if (count($value) > 1) {
-				$type = 'terms';
-			}
+		if (is_array($value) && count($value) > 1) {
+			$type = 'terms';
 		}
 		return array($type => array($key => $value));
 	}
@@ -673,6 +671,17 @@ class ElasticSource extends DataSource {
 	}
 
 /**
+ * Get the useType if its set, otherwise use the table name
+ *
+ * @param Model $Model 
+ * @return void
+ * @author David Kullmann
+ */
+	public function getType(Model $Model) {
+		return !empty($Model->useType) ? $Model->useType : $Model->useTable;
+	}
+
+/**
  * Check to see if a mapping exists
  *
  * @param Model $Model 
@@ -681,7 +690,7 @@ class ElasticSource extends DataSource {
  */
 	public function checkMapping(Model $Model) {
 		
-		$type = $Model->useTable;
+		$type = $this->getType($Model);
 		
 		$api = '_mapping';
 		
@@ -706,10 +715,10 @@ class ElasticSource extends DataSource {
 		
 		$properties = $this->_parseDescription($description);
 		
-		$type = $Model->useTable;
+		$type = $this->getType($Model);
 		
 		$mapping = array($type => compact('properties'));
-		
+
 		$result = $this->put($type, '_mapping', $mapping);
 
 		return $result;
@@ -723,7 +732,7 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function dropMapping(Model $Model) {
-		return $this->_delete($Model->useTable);
+		return $this->_delete($this->getType($Model));
 	}
 	
 
