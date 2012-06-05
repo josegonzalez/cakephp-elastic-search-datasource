@@ -60,6 +60,16 @@ class ElasticSource extends DataSource {
  */
 	protected $_listSources = false;
 	
+/**
+ * Query log
+ *
+ * @var string
+ */
+	protected $_queryLog = array(
+		'log' => array(),
+		'count' => 0,
+		'time' => 0
+	);
 
 /**
  * Constructor, call the parent and setup Http
@@ -173,11 +183,15 @@ class ElasticSource extends DataSource {
 			$api = $query;
 			$query = null;
 		} else {
-			$api = '_search';
+			$api = $Model->findQueryType === 'count' ? '_count' : '_search';
 		}
 
 		$results = $this->get($this->getType($Model), $api, $query);
 
+
+		if($Model->findQueryType === 'count') {
+			return array(array($Model->alias => array('count' => $results)));
+		}
 		return $results;
 	}
 	
@@ -388,6 +402,16 @@ class ElasticSource extends DataSource {
 
 		$query = array();
 		
+		if (empty($queryData['limit'])) {
+			$queryData['limit'] = 10;
+		}
+		
+		if($queryData['page'] === 1) {
+			$queryData['page'] = 0;
+		} else {
+			$queryData['page'] = $queryData['page'] * $queryData['limit'];
+		}
+		
 		foreach ($queryKeys as $old => $new) {
 			$query[$new] = empty($queryData[$old]) ? null : $queryData[$old];
 		}
@@ -404,6 +428,10 @@ class ElasticSource extends DataSource {
 		$query = compact('query', 'size', 'sort', 'from', 'fields');
 				
 		$query = Set::filter($query);
+
+		if ($Model->findQueryType === 'count') {
+			return $query['query'];
+		}
 
 		return $query;
 	}
@@ -505,7 +533,11 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _parseKey(Model $Model, $key, $value) {
-		
+
+		if (is_numeric($key) && empty($value)) {
+			return false;
+		}
+
 		$filter = array();
 		
 		$operatorMatch = '/^(((' . implode(')|(', $this->_filterOps);
@@ -543,10 +575,14 @@ class ElasticSource extends DataSource {
 			$filter = $this->missing($key, $value);
 		} else {
 			switch ($type) {
+				case 'float':
+					$filter = $this->range($key, $operator, (float)$value);
+					break;
 				case 'integer':
+					$value = (integer)$value;
 				case 'date':
 					$filter = $this->range($key, $operator, $value);
-					break; 
+					break;				
 				case 'multi_field':
 				case 'string':
 					$filter = $this->term($key, $operator, $value);
@@ -555,7 +591,7 @@ class ElasticSource extends DataSource {
 					$filter = $this->geo($key, $operator, $value);
 					break;
 				default:
-					throw new Exception("Unable to process field of type $type");
+					throw new Exception("Unable to process field of type '$type' for key '$key'");
 			}
 		}
 
@@ -822,8 +858,10 @@ class ElasticSource extends DataSource {
 				default:
 					$response = call_user_func_array(array(&$this->Http, $method), array($uri, $body));
 			}
-
+			
 			$results = $this->_parseResponse($response);
+			
+			$this->logQuery($method, $uri, $body, $results);
 
 			$results = $this->_filterResults($results);
 			
@@ -887,6 +925,9 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _filterResults($results = array()) {
+		if ($this->currentModel->findQueryType === 'count') {
+			return $results['count'];
+		}
 		if (!empty($results['hits'])) {
 			foreach($results['hits']['hits'] as &$result) {
 				$tmp = isset($result['_source']) ? $result['_source'] : array();
@@ -978,6 +1019,35 @@ class ElasticSource extends DataSource {
 		}
 
 		return $val;
+	}
+	
+	public function logQuery($method, $uri, $body, $results = array()) {
+		if (Configure::read('debug')) {
+			$query = strtoupper($method) . ': ' . $this->Http->url($uri) . " $body";
+			$took = !empty($results['took']) ? $results['took'] : 0;
+			$affected = !empty($results['hits']['total']) ? $results['hits']['total'] : 0;
+			$numRows = !empty($results['hits']['hits']) ? count($results['hits']['hits']) : 0;
+			$log = compact('query', 'affected', 'numRows', 'took');
+			
+			return $this->_addLog($log);
+		}
+		return true;
+	}
+	
+	public function getLog() {
+		return $this->_queryLog;
+	}
+	
+	protected function _addLog($data = array()) {
+		$count = $this->_queryLog['count'];
+		foreach ($data as $key => $value) {
+			$this->_queryLog['log'][$count][$key] = $value;
+			if ($key === 'took') {
+				$this->_queryLog['time'] += $value;
+			}
+		}
+		$this->_queryLog['count']++;
+		return $this->_queryLog['log'][$count];
 	}
 }
 ?>
