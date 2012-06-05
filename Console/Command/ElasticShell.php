@@ -18,15 +18,71 @@ class ElasticShell extends Shell {
 	public function getOptionParser() {
 		$parser = parent::getOptionParser();
 		return $parser->description('ElasticSearch Plugin Console Commands. Map and index data')
-			->addSubcommand('mapping', array('help' => 'Map a model to ElasticSearch'))
-			->addSubcommand('list_sources', array('help' => 'Display output from listSources'))
-			->addSubcommand('index', array('help' => 'Index a model into ElasticSearch'))
-				->addOption('action', array('help' => 'Action to do for mapping ("drop" or "create")','default' => 'create', 'short' => 'a'))
-				->addOption('model', array('help' => 'Model to use','short' => 'm'))
-				->addOption('limit', array('help' => 'Limit for indexing','short' => 'l', 'default' => 100))
-				->addOption('page', array('help' => 'Page to start indexing on','short' => 'p', 'default' => 1))
-				->addOption('fast', array('help' => 'Fast index (dont use saveAll)','short' => 'f', 'default' => false))
-				->addOption('reset', array('help' => 'Also reset the reset the mappings','short' => 'r', 'default' => 0));
+			->addSubcommand('create_index', array('help' => 'Create or alias an index', 'parser' => $this->getCreateIndexOptions()))
+			->addSubcommand('mapping', array('help' => 'Map a model to ElasticSearch', 'parser' => $this->getMappingOptions()))
+			->addSubcommand('index', array('help' => 'Index a model into ElasticSearch', 'parser' => $this->getIndexOptions()))
+			->addSubcommand('list_sources', array('help' => 'Display output from listSources'));
+	}
+	
+	public function getCreateIndexOptions() {
+		$parser = parent::getOptionParser();
+		$parser
+			->addArgument('index', array('help' => 'The index you are creating', 'required' => true))
+			->addOption('alias', array('help' => 'Instead of creating a new index, alias "index" to this value', 'default' => false, 'short' => 'a'))
+			->addOption('drop', array('help' => 'Instead of creating a new index, drop "index"', 'default' => false, 'short' => 'd'));
+		return $parser;
+	}
+	
+	public function getMappingOptions() {
+		$parser = parent::getOptionParser();
+		$parser
+			->addOption('action', array('help' => 'Action to do for mapping ("drop" or "create")','default' => 'create', 'short' => 'a'))
+			->addOption('model', array('help' => 'Model to use','short' => 'm'));
+		return $parser;
+	}
+	
+	public function getIndexOptions() {
+		$parser = parent::getOptionParser();
+		$parser
+			->addOption('model', array('help' => 'Model to use','short' => 'm'))
+			->addOption('limit', array('help' => 'Limit for indexing','short' => 'l', 'default' => 100))
+			->addOption('page', array('help' => 'Page to start indexing on','short' => 'p', 'default' => 1))
+			->addOption('fast', array('help' => 'Fast index (dont use saveAll)','short' => 'f', 'default' => false))
+			->addOption('reset', array('help' => 'Also reset the mappings','short' => 'r', 'default' => 0));
+		return $parser;
+	}
+	
+	public function create_index() {
+		extract($this->params);
+		
+		$index = $this->args[0];
+		
+		$ds = ConnectionManager::getDataSource('index');
+		
+		$action = 'created';
+		
+		try {
+			if ($drop) {
+				$action = 'dropped';
+				$result = $ds->dropIndex($index);
+			} else {
+				$result = $ds->createIndex($index, $alias);
+			}
+		} catch (Exception $e) {
+			$message = $e->getMessage();
+			$this->out("<error>$message</error>");
+			exit;
+		}
+		
+		if ($result) {
+			if ($alias) {
+				$this->out("Successfully aliased $alias to $index");
+			} else {
+				$this->out("Successfully $action $index");
+			}
+
+		}
+
 	}
 
 	public function mapping() {

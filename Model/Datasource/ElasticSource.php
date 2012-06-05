@@ -680,6 +680,46 @@ class ElasticSource extends DataSource {
 	public function getType(Model $Model) {
 		return !empty($Model->useType) ? $Model->useType : $Model->useTable;
 	}
+	
+	public function createIndex($index, $alias = false) {
+		$type = 'put';
+		$api = $index;
+		$body = null;
+
+		$tmp = $this->config['index'];
+		$this->config['index'] = null;
+		
+		if ($alias) {
+			$type = 'post';
+			$api = '_aliases';
+			$actions = array();
+			$actions[] = array('add' => compact('index', 'alias'));
+			$body = compact('actions');
+		}
+
+		try {
+			$return = $this->{$type}(null, $api, $body);
+		} catch (Exception $e) {
+			$message = $e->getMessage();
+			if (preg_match('/IndexAlreadyExistsException/', $message)) {
+				throw new Exception("ElasticSearch index '$index' already exists");
+			} else {
+				throw $e;
+			}
+		}
+	
+		$this->config['index'] = $tmp;
+	
+		return $return;
+	}
+	
+	public function dropIndex($index) {
+		$tmp = $this->config['index'];
+		$this->config['index'] = $index;
+		$results = $this->_delete();
+		$this->config['index'] = $tmp;
+		return $results;
+	}
 
 /**
  * Check to see if a mapping exists
