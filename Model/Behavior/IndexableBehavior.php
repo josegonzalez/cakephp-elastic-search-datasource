@@ -130,7 +130,7 @@ Class IndexableBehavior extends ModelBehavior {
 		return $documents;
 	}
 	
-	public function lastSync(Model $Model) {
+	public function lastSync(Model $Model, $params = array()) {
 		list($alias, $field) = $this->getModificationField($Model);
 		$modificationField = $alias.'.'.$field;
 		$fields = array($modificationField);
@@ -143,6 +143,10 @@ Class IndexableBehavior extends ModelBehavior {
 			$result = $result[$alias][$field];
 		}
 		return $result;
+	}
+	
+	public function syncConditions(Model $Model, $field, $date, $params = array()) {
+		return array($Model->alias.'.'.$field . ' >=' => $date);
 	}
 	
 	public function getModificationField($Model) {

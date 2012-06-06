@@ -45,6 +45,7 @@ class ElasticShell extends Shell {
 		$parser = parent::getOptionParser();
 		$parser
 			->addOption('model', array('help' => 'Model to use','short' => 'm'))
+			->addOption('extra', array('help' => 'Extra param for you to use, useful when overriding IndexableBehavior::lastSync()/syncConditions()','short' => 'e'))
 			->addOption('limit', array('help' => 'Limit for indexing','short' => 'l', 'default' => 100))
 			->addOption('page', array('help' => 'Page to start indexing on','short' => 'p', 'default' => 1))
 			->addOption('fast', array('help' => 'Fast index (dont use saveAll)','short' => 'f', 'default' => false))
@@ -152,10 +153,10 @@ class ElasticShell extends Shell {
 		$db = $this->Model->useDbConfig;
 
 		$this->Model->setDataSource('index');
-		$date = $this->Model->lastSync();
+		$date = $this->Model->lastSync($this->params);
 		$this->Model->setDataSource($db);
 		
-		$conditions = array($this->Model->alias.'.'.$field . ' >=' => $date);
+		$conditions = $this->Model->syncConditions($this->params);
 		$this->out('Retrieving data from mysql starting on ' . $date);
 		
 		$order = array($this->Model->alias.'.'.$field => 'ASC');
