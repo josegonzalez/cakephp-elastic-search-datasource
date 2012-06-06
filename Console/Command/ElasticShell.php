@@ -179,7 +179,7 @@ class ElasticShell extends Shell {
 					$page = 1;
 				}
 				$date = $newDate;
-				$conditions = array($this->Model->alias.'.'.$field . ' >=' => $newDate);
+				$conditions = $this->Model->syncConditions($field, $date, $this->params);
 			}
 
 			$this->_startTimer($tasks['mysql']);
