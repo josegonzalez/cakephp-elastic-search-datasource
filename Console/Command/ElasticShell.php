@@ -156,7 +156,7 @@ class ElasticShell extends Shell {
 		$date = $this->Model->lastSync($this->params);
 		$this->Model->setDataSource($db);
 		
-		$conditions = $this->Model->syncConditions($this->params);
+		$conditions = $this->Model->syncConditions($field, $date, $this->params);
 		$this->out('Retrieving data from mysql starting on ' . $date);
 		
 		$order = array($this->Model->alias.'.'.$field => 'ASC');
