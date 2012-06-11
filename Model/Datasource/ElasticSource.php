@@ -175,7 +175,7 @@ class ElasticSource extends DataSource {
  */
 	public function read(Model $Model, $queryData = array()) {
 
-		$this->currentModel = $Model;
+		$this->currentModel($Model);
 
 		$query = $this->generateQuery($Model, $queryData);
 
@@ -240,6 +240,20 @@ class ElasticSource extends DataSource {
 		$json = implode("\n", $json) . "\n";
 
 		return $this->post($type, '_bulk', $json, false);
+	}
+
+/**
+ * Get/set the current model - called when requests are starting
+ *
+ * @param Model $Model 
+ * @return Model the current model
+ * @author David Kullmann
+ */
+	public function currentModel(Model &$Model) {
+		if (is_object($Model)) {
+			$this->currentModel = &$Model;
+		}
+		return $this->currentModel;
 	}
 
 /**
@@ -793,8 +807,14 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function mapModel(Model $Model, $description = array()) {
-		
-		$properties = $this->_parseDescription($description);
+
+		if (empty($description[$Model->alias])) {
+			$tmp = $description;
+			unset($description);
+			$description = array($Model->alias => $tmp);
+		}
+
+		$properties = $this->_parseDescription($Model, $description);
 		
 		$type = $this->getType($Model);
 		
@@ -930,8 +950,10 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _filterResults($results = array()) {
-		if ($this->currentModel->findQueryType === 'count') {
-			return $results['count'];
+		if (!empty($this->currentModel)) {
+			if ($this->currentModel->findQueryType === 'count') {
+				return $results['count'];
+			}
 		}
 		if (!empty($results['hits'])) {
 			foreach($results['hits']['hits'] as &$result) {
@@ -971,7 +993,7 @@ class ElasticSource extends DataSource {
  * @return array Array representing ES Mapping
  * @author David Kullmann
  */
-	protected function _parseDescription($description = array()) {
+	protected function _parseDescription(Model $Model, $description = array()) {
 		
 		$properties = array();
 		
@@ -982,18 +1004,28 @@ class ElasticSource extends DataSource {
 
 				if (is_array($current)) {
 					$properties[$field] = array(
-						'properties' => $this->_parseDescription($info),
+						'properties' => $this->_parseDescription($Model, $info),
 						'type' => 'object'
 					);
 				} else {
-					foreach ($info as $attr => $val) {
-						$val = $this->_convertAttributes($attr, $val);
-						if ($val) {
-							$properties[$field][$attr] = $val;
-							if ($val === 'date') {
-								$properties[$field]['format'] = 'yyyy-MM-dd HH:mm:ss';
+					if (method_exists($Model, '_esFieldMapping')) {
+						$override = $Model->_esFieldMapping($field);
+					} else {
+						$override = false;
+					}
+					if ($override) {
+						$properties[$field] = $override;
+					} else {
+						foreach ($info as $attr => $val) {
+							$val = $this->_convertAttributes($attr, $val);
+							if ($val) {
+								$properties[$field][$attr] = $val;
+								if ($val === 'date') {
+									$properties[$field]['format'] = 'yyyy-MM-dd HH:mm:ss';
+								}
 							}
 						}
+						
 					}
 				}
 			}
