@@ -101,11 +101,11 @@ Class IndexableBehavior extends ModelBehavior {
 
 		$this->distanceField = sprintf("doc['%s.%s'].distance(%s, %s)", $alias, $geo['location'], $query['latitude'], $query['longitude']);
 
-		$query['fields'] = array(
-			'_source',
-			$this->distanceField
-		);
-		$query['order'] = array($alias.'.'.$geo['location'] => 'ASC');
+		if (empty($query['fields'])) {
+			$query['fields'] = array('_source', $this->distanceField);
+		} else {
+			$query['fields'] = array_merge($query['fields'], (array)$this->distanceField);
+		}
 
 		return $query;
 	}
