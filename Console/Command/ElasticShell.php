@@ -36,7 +36,7 @@ class ElasticShell extends Shell {
 	public function getMappingOptions() {
 		$parser = parent::getOptionParser();
 		$parser
-			->addOption('action', array('help' => 'Action to do for mapping ("drop" or "create")','default' => 'create', 'short' => 'a'))
+			->addOption('action', array('help' => 'Action to do for mapping (drop, create, update, check)', 'default' => 'create', 'short' => 'a'))
 			->addOption('model', array('help' => 'Model to use','short' => 'm'));
 		return $parser;
 	}
@@ -94,8 +94,8 @@ class ElasticShell extends Shell {
 		$ds = ConnectionManager::getDataSource('index');
 		$mapped = $ds->checkMapping($this->Model);
 
-		if ($action === 'create') {
-			if (!$mapped) {
+		if ($action === 'create' || $action === 'update') {
+			if (!$mapped || $action === 'update') {
 				$this->out("<info>Mapping " . $this->Model->alias . '</info>');
 				
 				if (method_exists($this->Model, 'elasticMapping')) {
@@ -104,7 +104,7 @@ class ElasticShell extends Shell {
 					$dboDS = ConnectionManager::getDataSource($this->Model->useDbConfig);
 					$mapping = $dboDS->describe($this->Model);
 				}
-				
+
 				$ds->mapModel($this->Model, $mapping);
 			} else {
 				$this->out($this->Model->alias . ' already mapped');
@@ -120,6 +120,9 @@ class ElasticShell extends Shell {
 				}
 				
 			}
+		} elseif ($action === 'check') {
+			$exists = $mapped ? '<info>exists</info>' : '<warning>does not exist</warning>';
+			$this->out("Mapping for " . $this->Model->alias . ' ' . $exists);
 		}
 	}
 	
