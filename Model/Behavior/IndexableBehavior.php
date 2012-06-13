@@ -109,7 +109,17 @@ Class IndexableBehavior extends ModelBehavior {
 
 		return $query;
 	}
-	
+
+/**
+ * Index a document or a list of documents, bypassing Model::save() (much faster)
+ *
+ * Good for indexing pre-validated data such as data from your DB
+ *
+ * @param Model $Model 
+ * @param array $documents 
+ * @return void
+ * @author David Kullmann
+ */
 	public function index(Model $Model, $documents = array()) {
 		$geoFields = !empty($this->settings[$Model->alias]['geoFields']) ? $this->settings[$Model->alias]['geoFields'] : false;
 		if ($geoFields) {
@@ -129,7 +139,15 @@ Class IndexableBehavior extends ModelBehavior {
 		$ds->commit();
 		return $documents;
 	}
-	
+
+/**
+ * Find the last model that was synced, override this in your model if you have a different method
+ *
+ * @param Model $Model 
+ * @param array $params 
+ * @return string Date string representing the last model synced to ES
+ * @author David Kullmann
+ */
 	public function lastSync(Model $Model, $params = array()) {
 		list($alias, $field) = $this->getModificationField($Model);
 		$modificationField = $alias.'.'.$field;
@@ -144,12 +162,29 @@ Class IndexableBehavior extends ModelBehavior {
 		}
 		return $result;
 	}
-	
+
+/**
+ * Build the sync conditions to sync models to ES, override in your Model if necessary
+ *
+ * @param Model $Model 
+ * @param string $field 
+ * @param string $date 
+ * @param string $params 
+ * @return void
+ * @author David Kullmann
+ */
 	public function syncConditions(Model $Model, $field, $date, $params = array()) {
 		return array($Model->alias.'.'.$field . ' >=' => $date);
 	}
-	
-	public function getModificationField($Model) {
+
+/**
+ * Get the modification field for this model - override in your Model if necessary
+ *
+ * @param Model $Model 
+ * @return void
+ * @author David Kullmann
+ */
+	public function getModificationField(Model $Model) {
 		$modificationField = $this->settings[$Model->alias]['modificationField'];
 		if (!strpos($modificationField, '.')) {
 			$modificationField = $Model->alias.'.'.$modificationField;

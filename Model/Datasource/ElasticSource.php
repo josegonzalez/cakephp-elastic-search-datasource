@@ -401,9 +401,10 @@ class ElasticSource extends DataSource {
 			'page' => 'from',
 			'query' => 'query',
 			'order' => 'sort',
-			'fields' => 'fields'
+			'fields' => 'fields',
+			'facets' => 'facets'
 		);
-
+		
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
 		
 		$queryData['conditions'] = $this->afterParseConditions($Model, $queryData['conditions']);
@@ -430,16 +431,18 @@ class ElasticSource extends DataSource {
 			$query[$new] = empty($queryData[$old]) ? null : $queryData[$old];
 		}
 		
-		
-		$query['query'] = empty($query['query']) ? array('match_all' => new Object()) : $query['query'];
-		
 		$query['type'] = $this->parseQueryType($query);
 		
+		$query['query'] = empty($query['query']) ? array('match_all' => new Object()) : $query['query'];
+
 		extract($query);
 		
-		$query = array($type => compact('query', 'filter'));
+		if ($type !== 'query') {
+			$query = array($type => compact('query', 'filter'));
+		}
 
-		$query = compact('query', 'size', 'sort', 'from', 'fields');
+
+		$query = compact('query', 'size', 'sort', 'from', 'fields', 'facets');
 				
 		$query = Set::filter($query);
 
@@ -451,14 +454,18 @@ class ElasticSource extends DataSource {
 	}
 	
 	public function parseQueryType($query) {
+		$type = 'filtered';
 		if (!empty($query['type'])) {
-			return $query['type'];
+			$type = $query['type'];
 		}
-		if (!empty($query['filter'])) {
-			return 'filtered';
-		} else {
-			return 'query_string';
+		if (empty($query['filter'])) {
+			if (empty($query['query'])) {
+				$type = 'query';
+			} else {
+				$type = 'query_string';
+			}
 		}
+		return $type;
 	}
 
 /**
@@ -953,6 +960,14 @@ class ElasticSource extends DataSource {
 		if (!empty($this->currentModel)) {
 			if ($this->currentModel->findQueryType === 'count') {
 				return $results['count'];
+			}
+		}
+		if (!empty($results['facets'])) {
+			if (!isset($this->currentModel->_facets)) {
+				$this->currentModel->_facets = array();
+			}
+			foreach ($results['facets'] as $facet => $data) {
+				$this->currentModel->_facets[$facet] = $data;
 			}
 		}
 		if (!empty($results['hits'])) {
