@@ -196,7 +196,11 @@ class ElasticShell extends Shell {
 				
 				$this->_startTimer($tasks['saving']);
 				if ($fast) {
-					$results = $this->Model->index($records);
+					try {
+						$results = $this->Model->index($records);
+					} catch (Exception $e) {
+						$this->out("Error: ". $e->getMessage());
+					}
 				} else {
 					$results = $this->Model->saveAll($records, array('deep' => true, 'validate' => false));
 				}
