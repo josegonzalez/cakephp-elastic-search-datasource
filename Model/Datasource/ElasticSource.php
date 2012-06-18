@@ -678,7 +678,9 @@ class ElasticSource extends DataSource {
 			$key => array(
 				'lat' => $this->currentModel->latitude,
 				'lon' => $this->currentModel->longitude
-			)
+			),
+			'unit' => 'miles',
+			'distance_type' => 'plane'
 		));
 	}
 
