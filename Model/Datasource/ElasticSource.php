@@ -959,7 +959,7 @@ class ElasticSource extends DataSource {
 	protected function _filterResults($results = array()) {
 		if (!empty($this->currentModel)) {
 			if ($this->currentModel->findQueryType === 'count') {
-				return $results['count'];
+				return empty($results['count']) ? $results : $results['count'];
 			}
 		}
 		if (!empty($results['facets'])) {
