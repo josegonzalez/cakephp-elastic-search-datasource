@@ -2,6 +2,25 @@
 
 App::uses('HttpSocket', 'Network/Http');
 
+
+/**
+ * Throw this when we are missing an index
+ *
+ * @package default
+ * @author David Kullmann
+ */
+class MissingIndexException extends CakeException {
+	
+	protected $_messageTemplate = 'Index "%s" is missing.';
+	
+}
+
+/**
+ * ElasticSource datasource for Elastic Search
+ *
+ * @package default
+ * @author David Kullmann
+ */
 class ElasticSource extends DataSource {
 
 /**
@@ -105,9 +124,16 @@ class ElasticSource extends DataSource {
 		
 		if (empty($this->_schema[$Model->alias][$Model->primaryKey])) {
 			$this->_schema[$Model->alias][$Model->primaryKey] = array('type' => 'string', 'length' => 255);
+		} elseif (!empty($this->_schema[$Model->alias][$Model->primaryKey]['type'])) {
+			if (empty($this->_schema[$Model->alias][$Model->primaryKey]['length'])) {
+				if ($this->_schema[$Model->alias][$Model->primaryKey]['type'] === 'string') {
+					$this->_schema[$Model->alias][$Model->primaryKey]['length'] = 255; 
+				} elseif ($this->_schema[$Model->alias][$Model->primaryKey]['type'] === 'integer') {
+					$this->_schema[$Model->alias][$Model->primaryKey]['length'] = 11;
+				}
+			}
 		}
 		
-
 		return $this->_schema[$Model->alias];
 	}
 
@@ -196,13 +222,28 @@ class ElasticSource extends DataSource {
 	}
 	
 	public function update(Model $Model, $fields = array(), $values = array()) {
-		// Not yet implemented
-		throw new Exception('Update not yet implemented by ElasticSource');
+		return $this->create($Model, $fields, $values);
 	}
-	
+
+/**
+ * Delete a record
+ *
+ * @param Model $Model 
+ * @param array $conditions 
+ * @return boolean True on success
+ * @author David Kullmann
+ */
 	public function delete(Model $Model, $conditions = null) {
-		// Not yet implemented
-		throw new Exception('Delete not yet implemented by ElasticSource');	
+		if (!empty($conditions)) {
+			$record = $Model->find('first', $conditions);
+		} else {
+			$record = $Model->findById($Model->id);
+		}
+		
+		$id = $record[$Model->alias][$Model->primaryKey];
+		$type = $this->getType($Model);
+
+		return $this->_delete($type, $id);
 	}
 	
 	public function query($method, $params, Model $Model) {
@@ -797,14 +838,10 @@ class ElasticSource extends DataSource {
 		$type = $this->getType($Model);
 		
 		$api = '_mapping';
-		
-		try {
-			$results = $this->get($type, $api);
-		} catch (Exception $e) {
-			return false;
-		}
 
-		return !empty($results);
+		$mappings = $this->get(null, $api);
+		
+		return !empty($mappings[$this->config['index']][$type]);
 	}
 
 /**
@@ -942,7 +979,7 @@ class ElasticSource extends DataSource {
 		}
 		
 		if (!empty($body->error)) {
-			throw new Exception("ElasticSearch Error: " . $body->error . ' Status: ' . $body->status);
+			return $this->_throwError($body);
 		}
 
 		if (!empty($body->ok) && $body->ok == true) {
@@ -1074,7 +1111,17 @@ class ElasticSource extends DataSource {
 
 		return $val;
 	}
-	
+
+/**
+ * Log a new query if debug is on
+ *
+ * @param string $method 
+ * @param string $uri 
+ * @param string $body 
+ * @param string $results 
+ * @return void
+ * @author David Kullmann
+ */
 	public function logQuery($method, $uri, $body, $results = array()) {
 		if (Configure::read('debug')) {
 			$query = strtoupper($method) . ': ' . $this->Http->url($uri) . " $body";
@@ -1087,11 +1134,24 @@ class ElasticSource extends DataSource {
 		}
 		return true;
 	}
-	
+
+/**
+ * Get the query log - support for DebugKit Toolbar
+ *
+ * @return void
+ * @author David Kullmann
+ */
 	public function getLog() {
 		return $this->_queryLog;
 	}
-	
+
+/**
+ * Added an item to the query log
+ *
+ * @param string $data 
+ * @return void
+ * @author David Kullmann
+ */
 	protected function _addLog($data = array()) {
 		$count = $this->_queryLog['count'];
 		foreach ($data as $key => $value) {
@@ -1102,6 +1162,22 @@ class ElasticSource extends DataSource {
 		}
 		$this->_queryLog['count']++;
 		return $this->_queryLog['log'][$count];
+	}
+
+/**
+ * Throw the right error
+ *
+ * @param string $info 
+ * @return void
+ * @author David Kullmann
+ */
+	protected function _throwError($info) {
+		switch($info->status) {
+			case '404':
+				throw new MissingIndexException(array('class' => $this->config['index']));
+			default:
+				throw new Exception("ElasticSearch Error: " . $body->error . ' Status: ' . $body->status);
+		}
 	}
 }
 ?>
