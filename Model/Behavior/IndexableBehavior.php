@@ -120,7 +120,10 @@ Class IndexableBehavior extends ModelBehavior {
  * @return void
  * @author David Kullmann
  */
-	public function index(Model $Model, $documents = array()) {
+	public function index(Model $Model, $documents = array(), $options = array()) {
+		$defaults = array('callbacks' => false);
+		$options = array_merge($defaults, $options);
+		
 		$geoFields = !empty($this->settings[$Model->alias]['geoFields']) ? $this->settings[$Model->alias]['geoFields'] : false;
 		if ($geoFields) {
 			extract($geoFields);
@@ -133,6 +136,15 @@ Class IndexableBehavior extends ModelBehavior {
 					'lat' => $document[$Model->alias][$latitude],
 					'lon' => $document[$Model->alias][$longitude]
 				);
+			}
+			if ($options['callbacks'] === true || $options['callbacks'] === 'before') {
+				$Model->set($document);
+				$event = new CakeEvent('Model.beforeSave', $Model, array($options));
+				list($event->break, $event->breakOn) = array(true, array(false, null));
+				$Model->getEventManager()->dispatch($event);
+				if (!$event->result) {
+					return false;
+				}
 			}
 			$ds->addToDocument($Model, $document);
 		}
