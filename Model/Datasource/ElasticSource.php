@@ -153,7 +153,7 @@ class ElasticSource extends DataSource {
 		return $sources;
 	}
 	
-	public function calculate(Model $Model, $func, $params) {
+	public function calculate(Model $Model, $func, $params = null) {
 		
 	}
 
