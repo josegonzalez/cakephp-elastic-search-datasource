@@ -657,6 +657,9 @@ class ElasticSource extends DataSource {
 				case 'geo_point':
 					$filter = $this->geo($key, $operator, $value);
 					break;
+				case 'boolean':
+					$filter = $this->term($key, $operator, $value);
+					break;
 				default:
 					throw new Exception("Unable to process field of type '$type' for key '$key'");
 			}
