@@ -153,7 +153,7 @@ class ElasticSource extends DataSource {
 		return $sources;
 	}
 	
-	public function calculate(Model $Model, $func, $params) {
+	public function calculate(Model $Model, $func, $params = null) {
 		
 	}
 
@@ -656,6 +656,9 @@ class ElasticSource extends DataSource {
 					 break;
 				case 'geo_point':
 					$filter = $this->geo($key, $operator, $value);
+					break;
+				case 'boolean':
+					$filter = $this->term($key, $operator, $value);
 					break;
 				default:
 					throw new Exception("Unable to process field of type '$type' for key '$key'");
