@@ -2,57 +2,102 @@
 App::uses('ConnectionManager', 'Model');
 
 class ElasticShell extends Shell {
-	
+
+/**
+ * Used to track time on indexing
+ *
+ * @var string
+ */
 	public $timers = array();
-	
+
+/**
+ * Start the timer for a task
+ *
+ * @param string $taskId 
+ * @return void
+ * @author David Kullmann
+ */
 	public function _startTimer($taskId) {
 		$this->timers[$taskId] = microtime(true);
 	}
 
+/**
+ * End a timer for a task and print the output if --verbose
+ *
+ * @param string $taskId 
+ * @return $float the time this task took
+ * @author David Kullmann
+ */
 	public function _endTimer($taskId) {
 		$time = microtime(true) - $this->timers[$taskId];
-		$this->out(sprintf("\tTask '%s' completed in %.2f seconds", $taskId, $time));
+		$this->out(sprintf("\tTask '%s' completed in %.2f seconds", $taskId, $time), 1, Shell::VERBOSE);
 		return $time;
 	}
-	
+
+/**
+ * Option parser for this shell
+ *
+ * @return object OptionParser
+ * @author David Kullmann
+ */
 	public function getOptionParser() {
-		$parser = parent::getOptionParser();
-		return $parser->description('ElasticSearch Plugin Console Commands. Map and index data')
-			->addSubcommand('create_index', array('help' => 'Create or alias an index', 'parser' => $this->getCreateIndexOptions()))
-			->addSubcommand('mapping', array('help' => 'Map a model to ElasticSearch', 'parser' => $this->getMappingOptions()))
-			->addSubcommand('index', array('help' => 'Index a model into ElasticSearch', 'parser' => $this->getIndexOptions()))
-			->addSubcommand('list_sources', array('help' => 'Display output from listSources'));
+		return parent::getOptionParser()
+			->description('ElasticSearch Plugin Console Commands. Map and index data')
+				->addSubcommand('create_index', array('help' => 'Create or alias an index', 'parser' => $this->getCreateIndexOptions()))
+				->addSubcommand('mapping', array('help' => 'Map a model to ElasticSearch', 'parser' => $this->getMappingOptions()))
+				->addSubcommand('index', array('help' => 'Index a model into ElasticSearch', 'parser' => $this->getIndexOptions()))
+				->addSubcommand('list_sources', array('help' => 'Display output from listSources'));
 	}
-	
+
+/**
+ * Options for creating/dropping indexes
+ *
+ * @return object OptionParser
+ * @author David Kullmann
+ */
 	public function getCreateIndexOptions() {
-		$parser = parent::getOptionParser();
-		$parser
+		return parent::getOptionParser()
 			->addArgument('index', array('help' => 'The index you are creating', 'required' => true))
 			->addOption('alias', array('help' => 'Instead of creating a new index, alias "index" to this value', 'default' => false, 'short' => 'a'))
 			->addOption('drop', array('help' => 'Instead of creating a new index, drop "index"', 'default' => false, 'short' => 'd'));
-		return $parser;
 	}
-	
+
+/**
+ * For mapping a type
+ *
+ * @return object OptionParser
+ * @author David Kullmann
+ */
 	public function getMappingOptions() {
-		$parser = parent::getOptionParser();
-		$parser
+		return parent::getOptionParser()
 			->addOption('action', array('help' => 'Action to do for mapping (drop, create, update, check)', 'default' => 'create', 'short' => 'a'))
-			->addOption('model', array('help' => 'Model to use','short' => 'm'));
-		return $parser;
+			->addOption('db_config', array('help' => 'DB config to use to get the schema', 'default' => 'default', 'short' => 'd'))
+			->addArgument('model', array('help' => 'Model to use', 'required' => true));
 	}
-	
+
+/**
+ * For indexing records
+ *
+ * @return object OptionParser
+ * @author David Kullmann
+ */
 	public function getIndexOptions() {
-		$parser = parent::getOptionParser();
-		$parser
-			->addOption('model', array('help' => 'Model to use','short' => 'm'))
+		return parent::getOptionParser()
+			->addArgument('model', array('help' => 'Model to use', 'required' => true))
+			->addOption('db_config', array('help' => 'DB config to use to get the schema', 'default' => 'default', 'short' => 'd'))
 			->addOption('extra', array('help' => 'Extra param for you to use, useful when overriding IndexableBehavior::lastSync()/syncConditions()','short' => 'e'))
 			->addOption('limit', array('help' => 'Limit for indexing','short' => 'l', 'default' => 100))
 			->addOption('page', array('help' => 'Page to start indexing on','short' => 'p', 'default' => 1))
 			->addOption('fast', array('help' => 'Fast index (dont use saveAll)','short' => 'f', 'default' => false))
 			->addOption('reset', array('help' => 'Also reset the mappings','short' => 'r', 'default' => 0));
-		return $parser;
 	}
-	
+
+/**
+ * Create an index
+ *
+ * @return void
+ * @author David Kullmann
+ */
 	public function create_index() {
 		extract($this->params);
 		
@@ -86,10 +131,23 @@ class ElasticShell extends Shell {
 
 	}
 
+/**
+ * Create a mapping for an ES type
+ *
+ * @return void
+ * @author David Kullmann
+ */
 	public function mapping() {
 		extract($this->params);
 		
+		$model = $this->args[0];
+		
 		$this->Model = $this->_getModel($model);
+		
+		if (get_class($this->Model) === 'AppModel') {
+			$this->out("<error>Couldn't load model $model</warning>");
+			exit;
+		}
 		
 		$ds = ConnectionManager::getDataSource('index');
 		$mapped = $ds->checkMapping($this->Model);
@@ -97,15 +155,20 @@ class ElasticShell extends Shell {
 		if ($action === 'create' || $action === 'update') {
 			if (!$mapped || $action === 'update') {
 				$this->out("<info>Mapping " . $this->Model->alias . '</info>');
-				
+
 				if (method_exists($this->Model, 'elasticMapping')) {
 					$mapping = $this->Model->elasticMapping();
 				} else {
-					$dboDS = ConnectionManager::getDataSource($this->Model->useDbConfig);
+					$dboDS = ConnectionManager::getDataSource($db_config);
 					$mapping = $dboDS->describe($this->Model);
 				}
-
-				$ds->mapModel($this->Model, $mapping);
+				
+				if (!empty($mapping)) {
+					$ds->mapModel($this->Model, $mapping);
+				} else {
+					$this->out("Unable to find mapping for $model");
+				}
+				
 			} else {
 				$this->out($this->Model->alias . ' already mapped');
 			}
@@ -148,18 +211,23 @@ class ElasticShell extends Shell {
 	public function index() {
 		
 		extract($this->params);
+
+		$model = $this->args[0];
 		
 		$this->Model = $this->_getModel($model);
+
+		if (!$this->Model->Behaviors->attached('Indexable')) {
+			$this->Model->Behaviors->load('Elastic.Indexable');
+		}
 		
 		list($alias, $field) = $this->Model->getModificationField();
 
-		$db = $this->Model->useDbConfig;
-
 		$this->Model->setDataSource('index');
 		$date = $this->Model->lastSync($this->params);
-		$this->Model->setDataSource($db);
+		$this->Model->setDataSource($db_config);
 		
 		$conditions = $this->Model->syncConditions($field, $date, $this->params);
+		
 		$this->out('Retrieving data from mysql starting on ' . $date);
 		
 		$order = array($this->Model->alias.'.'.$field => 'ASC');
@@ -172,6 +240,9 @@ class ElasticShell extends Shell {
 			'saving' => 'Saving to ElasticSearch'
 		);
 		
+		// Incase you have a zillion records we don't use pagination because of
+		// issues w/how MySQL does pagination. This will paginate properly even
+		// if many models have the same value in the modification field
 		do {
 			if(!empty($records)) {
 				$record = array_pop($records);
@@ -215,7 +286,7 @@ class ElasticShell extends Shell {
 
 			}
 			
-			$this->Model->setDataSource('default');
+			$this->Model->setDataSource($db_config);
 			
 		} while (!empty($records));
 

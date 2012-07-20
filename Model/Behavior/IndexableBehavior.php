@@ -166,7 +166,12 @@ Class IndexableBehavior extends ModelBehavior {
 		$fields = array($modificationField);
 		$order = array($modificationField => 'DESC');
 		$conditions = array('NOT' => array($modificationField => NULL));
-		$result = $Model->find('first', compact('fields', 'order', 'conditions'));
+		try {
+			$result = $Model->find('first', compact('fields', 'order', 'conditions'));
+		} catch (Exception $e) {
+			$result = null;
+		}
+
 		if (empty($result[$alias][$field])) {
 			$result = '1970-01-01 00:00:00';
 		} else {
