@@ -28,14 +28,14 @@ _[GIT Submodule]_
 
 In your app directory type:
 
-	git submodule add git://github.com/dkullmann/CakePHP-Backbone-Js-Helper.git Plugin/Elastic
+	git submodule add git://github.com/dkullmann/CakePHP-Elastic-Search-DataSource.git Plugin/Elastic
 	git submodule update --init
 
 _[GIT Clone]_
 
 In your app directory type
 
-	git clone git://github.com/dkullmann/CakePHP-Backbone-Js-Helper.git Plugin/Elastic
+	git clone git://github.com/dkullmann/CakePHP-Elastic-Search-DataSource.git Plugin/Elastic
 
 ### Enable plugin
 
