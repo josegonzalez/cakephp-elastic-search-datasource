@@ -1179,7 +1179,7 @@ class ElasticSource extends DataSource {
 			case '404':
 				throw new MissingIndexException(array('class' => $this->config['index']));
 			default:
-				throw new Exception("ElasticSearch Error: " . $body->error . ' Status: ' . $body->status);
+				throw new Exception("ElasticSearch Error: " . $info->error . ' Status: ' . $info->status);
 		}
 	}
 }
