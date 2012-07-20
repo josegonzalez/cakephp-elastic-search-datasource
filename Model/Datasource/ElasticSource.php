@@ -551,20 +551,24 @@ class ElasticSource extends DataSource {
 				$field = key($value);
 				$direction = current($value);
 			}
-			
+
+			$alias = $Model->useType;
+
 			if (strpos($field, '.')) {
 				list($alias, $field) = explode('.', $field);
-			} else {
-				$alias = $Model->alias;
 			}
-			
+
 			if ($alias !== $Model->alias) {
 				$aliasModel = ClassRegistry::init($alias);
 				$type = $aliasModel->getColumnType($field);
 			} else {
 				$type = $Model->getColumnType($field);
 			}
-			
+
+			if ($alias === $Model->alias && $Model->useType !== $alias) {
+				$alias =  $Model->useType;
+			}
+
 			switch ($type) {
 				case 'geo_point':
 					$results[] = array(
@@ -1021,7 +1025,7 @@ class ElasticSource extends DataSource {
 							list($alias, $field) = explode('.', $field);
 							$tmp[$alias][$field] = $value;
 						} else {
-							$tmp[0][$field] = $value;
+							$tmp[$this->currentModel->alias][$field] = $value;
 						}
 					}
 				}
@@ -1183,4 +1187,3 @@ class ElasticSource extends DataSource {
 		}
 	}
 }
-?>
