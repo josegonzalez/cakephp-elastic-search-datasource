@@ -198,6 +198,28 @@ The output should include:
 	  "exists" : true, "_source" : {"Contact":{"created":"2012-07-19 20:31:29","id":"1","modified":"2012-07-19 20:31:29","name":"David","number":"555-888-1212","special_type":"Multifield"}}
 	}
 
+## CRUD Operations
+
+Because ElasticSource conforms to the CakePHP ORM CRUD operations are easy:
+
+	// Create
+	$record = array(
+		'id' => 1,
+		'name' => 'David',
+	);
+	
+	$this->Model->create($data);
+	$this->Model->save();
+	
+	// Read
+	$this->Model->findById(1);
+	
+	// Update
+	$this->Model->save($data);
+	
+	// Delete
+	$this->Model->delete(1);
+
 ## Additional
 
 Advanced features available using the IndexableBehavior such as geo location searching and sorting
