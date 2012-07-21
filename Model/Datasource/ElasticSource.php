@@ -717,15 +717,28 @@ class ElasticSource extends DataSource {
 	}
 	
 	public function geo($key, $operator, $value) {
-		return array('geo_distance_range' => array(
-			'lte' => $value,
-			$key => array(
-				'lat' => $this->currentModel->latitude,
-				'lon' => $this->currentModel->longitude
-			),
-			'unit' => 'miles',
-			'distance_type' => 'plane'
-		));
+		$return = array();
+		if (is_array($value)) {
+			$isBoundingBox = in_array(key($value), array('top_left', 'bottom_right'));
+			if ($isBoundingBox) {
+				$return = array(
+					'geo_bounding_box' => array(
+						$key => $value
+					)
+				);
+			}
+		} else {
+			$return = array('geo_distance_range' => array(
+				'lte' => $value,
+				$key => array(
+					'lat' => $this->currentModel->latitude,
+					'lon' => $this->currentModel->longitude
+				),
+				'unit' => 'miles',
+				'distance_type' => 'plane'
+			));
+		}
+		return $return;
 	}
 
 /**
