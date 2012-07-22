@@ -46,6 +46,7 @@ class ElasticShell extends Shell {
 				->addSubcommand('create_index', array('help' => 'Create or alias an index', 'parser' => $this->getCreateIndexOptions()))
 				->addSubcommand('mapping', array('help' => 'Map a model to ElasticSearch', 'parser' => $this->getMappingOptions()))
 				->addSubcommand('index', array('help' => 'Index a model into ElasticSearch', 'parser' => $this->getIndexOptions()))
+				->addSubcommand('copy_index', array('help' => 'Hot copies all data from one index to a new one', 'parser' => $this->getCopyIndexOptions()))
 				->addSubcommand('list_sources', array('help' => 'Display output from listSources'));
 	}
 
@@ -59,7 +60,12 @@ class ElasticShell extends Shell {
 		return parent::getOptionParser()
 			->addArgument('index', array('help' => 'The index you are creating', 'required' => true))
 			->addOption('alias', array('help' => 'Instead of creating a new index, alias "index" to this value', 'default' => false, 'short' => 'a'))
-			->addOption('drop', array('help' => 'Instead of creating a new index, drop "index"', 'default' => false, 'short' => 'd'));
+			->addOption('drop', array('help' => 'Instead of creating a new index, drop "index"', 'default' => false, 'short' => 'd', 'boolean' => true))
+			->addOption('connection', array(
+				'short' => 'c',
+				'help' => 'Name of datasource connection to be used as defined in database.php',
+				'default' => 'index'
+			));
 	}
 
 /**
@@ -71,8 +77,12 @@ class ElasticShell extends Shell {
 	public function getMappingOptions() {
 		return parent::getOptionParser()
 			->addOption('action', array('help' => 'Action to do for mapping (drop, create, update, check)', 'default' => 'create', 'short' => 'a'))
-			->addOption('db_config', array('help' => 'DB config to use to get the schema', 'default' => 'default', 'short' => 'd'))
-			->addArgument('model', array('help' => 'Model to use', 'required' => true));
+			->addArgument('model', array('help' => 'Model to use', 'required' => true))
+			->addOption('connection', array(
+				'short' => 'c',
+				'help' => 'Name of datasource connection to be used as defined in database.php',
+				'default' => 'index'
+			));
 	}
 
 /**
@@ -93,6 +103,23 @@ class ElasticShell extends Shell {
 	}
 
 /**
+ * For indexing records
+ *
+ * @return object OptionParser
+ * @author David Kullmann
+ */
+	public function getCopyIndexOptions() {
+		return parent::getOptionParser()
+			->addArgument('index', array('help' => 'The index you are creating', 'required' => true))
+			->addArgument('model', array('help' => 'Model to use (Used for mappinps)', 'required' => true))
+			->addOption('connection', array(
+				'short' => 'c',
+				'help' => 'Name of datasource connection to be used as defined in database.php',
+				'default' => 'index'
+			));
+	}
+
+/**
  * Create an index
  *
  * @return void
@@ -103,12 +130,12 @@ class ElasticShell extends Shell {
 		
 		$index = $this->args[0];
 		
-		$ds = ConnectionManager::getDataSource('index');
+		$ds = ConnectionManager::getDataSource($this->params['connection']);
 		
 		$action = 'created';
-		
+		$alias = empty($this->params['alias']) ? false : $this->params['alias'];
 		try {
-			if ($drop) {
+			if (!empty($this->params['drop'])) {
 				$action = 'dropped';
 				$result = $ds->dropIndex($index);
 			} else {
@@ -149,7 +176,7 @@ class ElasticShell extends Shell {
 			exit;
 		}
 		
-		$ds = ConnectionManager::getDataSource('index');
+		$ds = ConnectionManager::getDataSource($this->params['connection']);
 		$mapped = $ds->checkMapping($this->Model);
 
 		if ($action === 'create' || $action === 'update') {
@@ -159,8 +186,7 @@ class ElasticShell extends Shell {
 				if (method_exists($this->Model, 'elasticMapping')) {
 					$mapping = $this->Model->elasticMapping();
 				} else {
-					$dboDS = ConnectionManager::getDataSource($db_config);
-					$mapping = $dboDS->describe($this->Model);
+					$mapping = $ds->describe($this->Model);
 				}
 				
 				if (!empty($mapping)) {
@@ -351,5 +377,40 @@ class ElasticShell extends Shell {
 			$this->out('No mapping errors found');	
 		}
 	}
+
+	public function copy_index() {
+		$this->Model = $this->_getModel($this->args[1]);
+		$ds = ConnectionManager::getDataSource($this->params['connection']);
 	
+		$ds->dropIndex($this->args[0]);
+		$ds->createIndex($this->args[0]);
+		
+
+		if (method_exists($this->Model, 'elasticMapping')) {
+			$mapping = $this->Model->elasticMapping();
+		} else if ($this->Model->useDbConfig === $this->params['connection']) {
+			$mapping = $this->Model->schema();
+		} else {
+			$mapping = $ds->describe($this->Model);
+		}
+
+		$source = ConnectionManager::create('__temp_source__', array('index' => $this->args[0]) + $ds->config);
+		if (!empty($mapping)) {
+			$source->mapModel($this->Model, $mapping);
+			$this->out('<success>Mapping created</success>');
+		} else {
+			$this->out("Unable to find mapping for $model");
+		}
+
+		$cursor = $this->Model->scan(200, '1m');
+		foreach ($cursor as $row) {
+			$row['id'] = $row[$this->Model->alias]['id'];
+			unset($row[$this->Model->alias]);
+			$row['timestamp'] = new DateTime($row['timestamp']);
+			$row['timestamp'] = $row['timestamp']->format('Y-m-d H:i:s');
+			$source->create($this->Model, array_keys($row), array_values($row));
+		}
+
+	}
+
 }

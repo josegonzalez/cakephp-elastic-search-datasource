@@ -1,6 +1,7 @@
 <?php
 
 App::uses('HttpSocket', 'Network/Http');
+App::uses('ElasticScroll', 'ElasticSearch.Model/Datasource/Cursor');
 
 
 /**
@@ -247,6 +248,9 @@ class ElasticSource extends DataSource {
 	}
 	
 	public function query($method, $params, Model $Model) {
+		if ($method === 'scan') {
+			return call_user_func_array(array($this, $method), array_merge(array($Model), $params));
+		}
 		if (preg_match('/find(All)?By(.+)/', $method, $matches)) {
 			$type = $matches[1] === 'All' ? 'all' : 'first';
 			$conditions = array( strtolower($matches[2]) => $params );
@@ -445,7 +449,7 @@ class ElasticSource extends DataSource {
 			'fields' => 'fields',
 			'facets' => 'facets'
 		);
-		
+
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
 		
 		$queryData['conditions'] = $this->afterParseConditions($Model, $queryData['conditions']);
@@ -552,7 +556,7 @@ class ElasticSource extends DataSource {
 				$direction = current($value);
 			}
 
-			$alias = $Model->useType;
+			$alias = $Model->alias;
 
 			if (strpos($field, '.')) {
 				list($alias, $field) = explode('.', $field);
@@ -859,12 +863,13 @@ class ElasticSource extends DataSource {
  * @return boolean true on success
  * @author David Kullmann
  */
-	public function mapModel(Model $Model, $description = array()) {
+	public function mapModel(Model $Model, $description = array(), $alias = true) {
 
-		if (empty($description[$Model->alias])) {
+		$alias = $Model->alias;
+		if (empty($description[$alias])) {
 			$tmp = $description;
 			unset($description);
-			$description = array($Model->alias => $tmp);
+			$description = array($alias => $tmp);
 		}
 
 		$properties = $this->_parseDescription($Model, $description);
@@ -888,7 +893,23 @@ class ElasticSource extends DataSource {
 	public function dropMapping(Model $Model) {
 		return $this->_delete($this->getType($Model));
 	}
-	
+
+
+	public function scan(Model $model, $pageSize = 50, $cursorTtl = '2m') {
+		$query = array('search_type' => 'scan', 'scroll' => $cursorTtl, 'size' => $pageSize);
+
+		$this->currentModel($model);
+		$type = $this->getType($model);
+		$api = '_search';
+		$method = 'get';
+		$results = $this->execute($method, $type, $api, compact('query'));
+		if (empty($results['hits']['total'])) {
+			return array();
+		}
+		$total = $results['hits']['total'];
+		$scrollId = $results['_scroll_id'];
+		return new ElasticScroll($this, compact('total', 'scrollId', 'type', 'api', 'method') + array('limit' => $pageSize));
+	}
 
 /**
  * Call HttpSocket methods
@@ -921,13 +942,23 @@ class ElasticSource extends DataSource {
 				$body = null;
 			}
 
-			$path = array_filter(array($this->config['index'], $type, $api));
+			return $this->filterResults($this->execute($method, $type, $api, compact('body')));
+		} else {
+			throw new Exception("Method $method does not exist on ElasticSource");
+		}
+	}
 
+	public function execute($method, $type, $api, $data = array()) {
+			$path = array_filter(array($this->config['index'], $type, $api));
 			$path = '/' . implode('/', $path);
-			
-			$uri = $this->_uri(compact('path'));
-			
-			$response = array();
+
+			//Could contain $body and $query
+			extract($data);
+			$uri = $this->_uri(compact('path', 'query'));
+
+			if (!isset($body)) {
+				$body = null;
+			}
 
 			switch ($method) {
 				case 'get':
@@ -938,15 +969,11 @@ class ElasticSource extends DataSource {
 			}
 
 			$results = $this->_parseResponse($response);
-			
+			if (!is_string($body)) {
+				$body = json_encode($body);
+			}
 			$this->logQuery($method, $uri, $body, $results);
-
-			$results = $this->_filterResults($results);
-			
 			return $results;
-		} else {
-			throw new Exception("Method $method does not exist on ElasticSource");
-		}
 	}
 
 /**
@@ -1002,7 +1029,7 @@ class ElasticSource extends DataSource {
  * @return array Array of results
  * @author David Kullmann
  */
-	protected function _filterResults($results = array()) {
+	public function filterResults($results = array()) {
 		if (!empty($this->currentModel)) {
 			if ($this->currentModel->findQueryType === 'count') {
 				return empty($results['count']) ? $results : $results['count'];
