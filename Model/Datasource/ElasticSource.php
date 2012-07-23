@@ -1,6 +1,7 @@
 <?php
 
 App::uses('HttpSocket', 'Network/Http');
+App::uses('ElasticScroll', 'ElasticSearch.Model/Datasource/Cursor');
 
 
 /**
@@ -247,6 +248,9 @@ class ElasticSource extends DataSource {
 	}
 	
 	public function query($method, $params, Model $Model) {
+		if ($method === 'scan') {
+			return call_user_func_array(array($this, $method), array_merge(array($Model), $params));
+		}
 		if (preg_match('/find(All)?By(.+)/', $method, $matches)) {
 			$type = $matches[1] === 'All' ? 'all' : 'first';
 			$conditions = array( strtolower($matches[2]) => $params );
@@ -445,7 +449,7 @@ class ElasticSource extends DataSource {
 			'fields' => 'fields',
 			'facets' => 'facets'
 		);
-		
+
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
 		
 		$queryData['conditions'] = $this->afterParseConditions($Model, $queryData['conditions']);
@@ -551,20 +555,24 @@ class ElasticSource extends DataSource {
 				$field = key($value);
 				$direction = current($value);
 			}
-			
+
+			$alias = $Model->alias;
+
 			if (strpos($field, '.')) {
 				list($alias, $field) = explode('.', $field);
-			} else {
-				$alias = $Model->alias;
 			}
-			
+
 			if ($alias !== $Model->alias) {
 				$aliasModel = ClassRegistry::init($alias);
 				$type = $aliasModel->getColumnType($field);
 			} else {
 				$type = $Model->getColumnType($field);
 			}
-			
+
+			if ($alias === $Model->alias && $Model->useType !== $alias) {
+				$alias =  $Model->useType;
+			}
+
 			switch ($type) {
 				case 'geo_point':
 					$results[] = array(
@@ -868,12 +876,13 @@ class ElasticSource extends DataSource {
  * @return boolean true on success
  * @author David Kullmann
  */
-	public function mapModel(Model $Model, $description = array()) {
+	public function mapModel(Model $Model, $description = array(), $alias = true) {
 
-		if (empty($description[$Model->alias])) {
+		$alias = $Model->alias;
+		if (empty($description[$alias])) {
 			$tmp = $description;
 			unset($description);
-			$description = array($Model->alias => $tmp);
+			$description = array($alias => $tmp);
 		}
 
 		$properties = $this->_parseDescription($Model, $description);
@@ -897,7 +906,66 @@ class ElasticSource extends DataSource {
 	public function dropMapping(Model $Model) {
 		return $this->_delete($this->getType($Model));
 	}
-	
+
+
+/**
+ * Returns an iterator with all results for an index type, the results order is maintained
+ * by Elastic search for $cursorTtl time in minutes. This function is commonly used for re-indexing
+ * a type when it's internal pproperty definition change.
+ *
+ * @param Model $model The model intance to introspect to get the scrollable results
+ * @param integer $pageSize as results are iterated, how large should the page be when asking Elastic Searhc for results
+ *  bigger numbers make fewer requests to ElasticSearch but consume more memory and take longer to process in php
+ * @param string $cursorTtl Time to keep cursor results cached in Elastic Seaach (Example: '10m' for ten minutes)
+ * @return ElasticScroll result iterator with all entries for an index type.
+ **/
+	public function scan(Model $model, $pageSize = 50, $cursorTtl = '2m') {
+		$query = array('search_type' => 'scan', 'scroll' => $cursorTtl, 'size' => $pageSize);
+
+		$this->currentModel($model);
+		$type = $this->getType($model);
+		$api = '_search';
+		$method = 'get';
+		$results = $this->execute($method, $type, $api, compact('query'));
+		if (empty($results['hits']['total'])) {
+			return array();
+		}
+		$total = $results['hits']['total'];
+		$scrollId = $results['_scroll_id'];
+		return new ElasticScroll(clone $this, compact('total', 'scrollId', 'type', 'api', 'method') + array('limit' => $pageSize));
+	}
+
+/**
+ * Copies all documents from an index type to another
+ *
+ * @param ElasticScroll $scroll Iterator with results to be copied, can be from another server.
+ * @param array $options Array with following options:
+ *  - toIndex: Target index name. If none provided then default configured index for this datasource will be used
+ *		leave blanck wehn oyu want to copy data from one server to the other using same index name.
+ *	- toType: Type name to use for storing new documents in target index (required)
+ *	- transform: A callback function that will get each document before it is stored in target index.
+ *		useful for adding, removing or changing any data before it is saved.
+ * @return void
+ **/
+	public function reindex(ElasticScroll $scroll, array $options = array()) {
+		$options += array('transform' => null, 'toIndex' => $this->config['index'], 'toType' => null);
+
+		if (empty($options['toType'])) {
+			throw InvalidArgumentException('toIndex option is required for reindex');
+		}
+
+		$backIndex = $this->config['index'];
+		$this->config['index'] = $options['toIndex'];
+		foreach ($scroll as $row) {
+			if ($options['transform']) {
+				$row = call_user_func_array($options['transform'], array($row, $this));
+			}
+			$key = key($row);
+			$this->index($options['toType'], $row[$key]['id'], $row);
+		}
+
+		$this->config['index'] = $backIndex;
+	}
 
 /**
  * Call HttpSocket methods
@@ -930,13 +998,23 @@ class ElasticSource extends DataSource {
 				$body = null;
 			}
 
-			$path = array_filter(array($this->config['index'], $type, $api));
+			return $this->filterResults($this->execute($method, $type, $api, compact('body')));
+		} else {
+			throw new Exception("Method $method does not exist on ElasticSource");
+		}
+	}
 
+	public function execute($method, $type, $api, $data = array()) {
+			$path = array_filter(array($this->config['index'], $type, $api));
 			$path = '/' . implode('/', $path);
-			
-			$uri = $this->_uri(compact('path'));
-			
-			$response = array();
+
+			//Could contain $body and $query
+			extract($data);
+			$uri = $this->_uri(compact('path', 'query'));
+
+			if (!isset($body)) {
+				$body = null;
+			}
 
 			switch ($method) {
 				case 'get':
@@ -947,15 +1025,11 @@ class ElasticSource extends DataSource {
 			}
 
 			$results = $this->_parseResponse($response);
-			
+			if (!is_string($body)) {
+				$body = json_encode($body);
+			}
 			$this->logQuery($method, $uri, $body, $results);
-
-			$results = $this->_filterResults($results);
-			
 			return $results;
-		} else {
-			throw new Exception("Method $method does not exist on ElasticSource");
-		}
 	}
 
 /**
@@ -1011,7 +1085,7 @@ class ElasticSource extends DataSource {
  * @return array Array of results
  * @author David Kullmann
  */
-	protected function _filterResults($results = array()) {
+	public function filterResults($results = array()) {
 		if (!empty($this->currentModel)) {
 			if ($this->currentModel->findQueryType === 'count') {
 				return empty($results['count']) ? $results : $results['count'];
@@ -1034,7 +1108,7 @@ class ElasticSource extends DataSource {
 							list($alias, $field) = explode('.', $field);
 							$tmp[$alias][$field] = $value;
 						} else {
-							$tmp[0][$field] = $value;
+							$tmp[$this->currentModel->alias][$field] = $value;
 						}
 					}
 				}
@@ -1196,4 +1270,3 @@ class ElasticSource extends DataSource {
 		}
 	}
 }
-?>
