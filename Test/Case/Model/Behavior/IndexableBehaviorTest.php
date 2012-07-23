@@ -73,7 +73,13 @@ class IndexableBehaviorTestCase extends CakeTestCase {
 		$result = $this->Indexable->index($Model, $documents, $options);
 		$this->assertEqual($expected, $result);
 	}
-	
+
+/**
+ * Make sure that the Indexable::index() method performs callbacks (beforeSave only at the moment)
+ *
+ * @return void
+ * @author David Kullmann
+ */
 	public function testIndexWithCallback() {
 		$Model = $this->getMock('Model', array('getDataSource', 'beforeSave'));
 		

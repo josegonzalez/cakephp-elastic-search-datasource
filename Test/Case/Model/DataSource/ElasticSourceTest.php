@@ -1,14 +1,9 @@
 <?php
 App::uses('Model', 'Model');
 
-class ElasticSourceTestModel extends Model {
-	
-	public $useDbConfig = 'test_index';
-	
-}
 class ElasticSourceTest extends CakeTestCase {
 	
-	public $fixtures = array('elastic.elastic_source_test');
+	public $fixtures = array('plugin.elastic.elastic_test_model');
 
 /**
  * Setup each test
@@ -21,7 +16,7 @@ class ElasticSourceTest extends CakeTestCase {
 		if (!($this->Es instanceof ElasticSource)) {
 			$this->markTestSkipped('Unable to load elastic_test datasource for ElasticSource');
 		}
-		$this->Model = ClassRegistry::init('ElasticSourceTestModel');
+		$this->Model = ClassRegistry::init('TestModel');
 	}
 
 /**
@@ -61,7 +56,7 @@ class ElasticSourceTest extends CakeTestCase {
  * @author David Kullmann
  */
 	public function testGetType() {
-		$expected = 'elastic_source_test_models';
+		$expected = 'test_models';
 		$result = $this->Es->getType($this->Model);
 		
 		$this->assertEquals($expected, $result);
@@ -81,8 +76,11 @@ class ElasticSourceTest extends CakeTestCase {
  * @author David Kullmann
  */
 	public function testMapping() {
+		
+		$Unmapped = new Model(array('table' => 'map_test', 'name' => 'MapTest', 'ds' => 'test_index'));
+		
 		$description = array(
-			$this->Model->alias => array(
+			$Unmapped->alias => array(
 				'id' => array(
 					'key' => 'primary',
 					'length' => 11,
@@ -98,40 +96,40 @@ class ElasticSourceTest extends CakeTestCase {
 		);
 		
 		$expected = true;
-		$result = $this->Es->mapModel($this->Model, $description);
+		$result = $this->Es->mapModel($Unmapped, $description);
 		$this->assertEquals($expected, $result);
 
 		$expected = array(
 			'id' => array('type' => 'integer', 'length' => 11),
 			'string' => array('type' => 'string')
 		);
-		$result = $this->Es->describe($this->Model);
+		$result = $this->Es->describe($Unmapped);
 		$this->assertEquals($expected, $result);
 		
 		$expected = true;
-		$result = $this->Es->checkMapping($this->Model);
+		$result = $this->Es->checkMapping($Unmapped);
 		$this->assertEquals($expected, $result);
 		
 		$expected = true;
-		$result = $this->Es->dropMapping($this->Model);
+		$result = $this->Es->dropMapping($Unmapped);
 		$this->assertEquals($expected, $result);
 		
 		$expected = false;
-		$result = $this->Es->checkMapping($this->Model);
+		$result = $this->Es->checkMapping($Unmapped);
 		$this->assertEquals($expected, $result);
 		
 		// Also parse descriptions w/no alias
-		$description = $description[$this->Model->alias];
+		$description = $description[$Unmapped->alias];
 		
 		$expected = true;
-		$result = $this->Es->mapModel($this->Model, $description);
+		$result = $this->Es->mapModel($Unmapped, $description);
 		$this->assertEquals($expected, $result);
 
 		$expected = array(
 			'id' => array('type' => 'integer', 'length' => 11),
 			'string' => array('type' => 'string')
 		);
-		$result = $this->Es->describe($this->Model);
+		$result = $this->Es->describe($Unmapped);
 		$this->assertEquals($expected, $result);
 	}
 
@@ -238,51 +236,6 @@ class ElasticSourceTest extends CakeTestCase {
 		$expected = array('type', 'type2');
 		$result = $this->Es->parseMapping($mapping, true);
 		$this->assertEquals($expected, $result);	
-	}
-
-/**
- * Test the update function
- *
- * @return void
- * @author David Kullmann
- */
-	public function testUpdate() {
-		
-		$description = array(
-			$this->Model->alias => array(
-				'id' => array(
-					'key' => 'primary',
-					'length' => 11,
-					'type' => 'integer'
-				),
-				'string' => array(
-					'type' => 'string',
-					'length' => 255,
-					'null' => false,
-					'default' => null
-				)
-			)
-		);
-		
-		$expected = true;
-		$result = $this->Es->mapModel($this->Model, $description);
-		$this->assertEquals($expected, $result);
-		
-
-		$data = array(
-			'id' => 123,
-			'string' => 'test'
-		);
-		
-		$expected = array($this->Model->alias => $data);
-		$result = $this->Model->save($data);
-
-		$this->assertEquals($expected, $result);
-		
-		$expected = true;
-		$result = $this->Model->delete($data['id']);
-		$this->assertEquals($expected, $result);
-		
 	}
 	
 }
