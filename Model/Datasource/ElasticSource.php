@@ -895,6 +895,17 @@ class ElasticSource extends DataSource {
 	}
 
 
+/**
+ * Returns an iterator with all results for an index type, the results order is maintained
+ * by Elastic search for $cursorTtl time in minutes. This function is commonly used for re-indexing
+ * a type when it's internal pproperty definition change.
+ *
+ * @param Model $model The model intance to introspect to get the scrollable results
+ * @param integer $pageSize as results are iterated, how large should the page be when asking Elastic Searhc for results
+ *  bigger numbers make fewer requests to ElasticSearch but consume more memory and take longer to process in php
+ * @param string $cursorTtl Time to keep cursor results cached in Elastic Seaach (Example: '10m' for ten minutes)
+ * @return ElasticScroll result iterator with all entries for an index type.
+ **/
 	public function scan(Model $model, $pageSize = 50, $cursorTtl = '2m') {
 		$query = array('search_type' => 'scan', 'scroll' => $cursorTtl, 'size' => $pageSize);
 
