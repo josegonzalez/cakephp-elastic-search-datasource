@@ -919,7 +919,39 @@ class ElasticSource extends DataSource {
 		}
 		$total = $results['hits']['total'];
 		$scrollId = $results['_scroll_id'];
-		return new ElasticScroll($this, compact('total', 'scrollId', 'type', 'api', 'method') + array('limit' => $pageSize));
+		return new ElasticScroll(clone $this, compact('total', 'scrollId', 'type', 'api', 'method') + array('limit' => $pageSize));
+	}
+
+/**
+ * Copies all documents from an index type to another
+ *
+ * @param ElasticScroll $scroll Iterator with results to be copied, can be from another server.
+ * @param array $options Array with following options:
+ *  - toIndex: Target index name. If none provided then default configured index for this datasource will be used
+ *		leave blanck wehn oyu want to copy data from one server to the other using same index name.
+ *	- toType: Type name to use for storing new documents in target index (required)
+ *	- transform: A callback function that will get each document before it is stored in target index.
+ *		useful for adding, removing or changing any data before it is saved.
+ * @return void
+ **/
+	public function reindex(ElasticScroll $scroll, array $options = array()) {
+		$options += array('transform' => null, 'toIndex' => $this->config['index'], 'toType' => null);
+
+		if (empty($options['toType'])) {
+			throw InvalidArgumentException('toIndex option is required for reindex');
+		}
+
+		$backIndex = $this->config['index'];
+		$this->config['index'] = $options['toIndex'];
+		foreach ($scroll as $row) {
+			if ($options['transform']) {
+				$row = call_user_func_array($options['transform'], array($row, $this));
+			}
+			$key = key($row);
+			$this->index($options['toType'], $row[$key]['id'], $row);
+		}
+
+		$this->config['index'] = $backIndex;
 	}
 
 /**

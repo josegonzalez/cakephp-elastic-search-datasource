@@ -378,39 +378,17 @@ class ElasticShell extends Shell {
 		}
 	}
 
+/**
+ * Copies all data from one index/type to another
+ *
+ * @return void
+ **/
 	public function copy_index() {
 		$this->Model = $this->_getModel($this->args[1]);
 		$ds = ConnectionManager::getDataSource($this->params['connection']);
-	
-		$ds->dropIndex($this->args[0]);
-		$ds->createIndex($this->args[0]);
-		
-
-		if (method_exists($this->Model, 'elasticMapping')) {
-			$mapping = $this->Model->elasticMapping();
-		} else if ($this->Model->useDbConfig === $this->params['connection']) {
-			$mapping = $this->Model->schema();
-		} else {
-			$mapping = $ds->describe($this->Model);
-		}
-
-		$source = ConnectionManager::create('__temp_source__', array('index' => $this->args[0]) + $ds->config);
-		if (!empty($mapping)) {
-			$source->mapModel($this->Model, $mapping);
-			$this->out('<success>Mapping created</success>');
-		} else {
-			$this->out("Unable to find mapping for $model");
-		}
-
-		$cursor = $this->Model->scan(200, '1m');
-		foreach ($cursor as $row) {
-			$row['id'] = $row[$this->Model->alias]['id'];
-			unset($row[$this->Model->alias]);
-			$row['timestamp'] = new DateTime($row['timestamp']);
-			$row['timestamp'] = $row['timestamp']->format('Y-m-d H:i:s');
-			$source->create($this->Model, array_keys($row), array_values($row));
-		}
-
+		$cursor = $this->Model->scan(200, '5m');
+		$ds->reindex($cursor, array('toIndex' => $this->args[0], 'toType' => $ds->getType($this->Model)));
+		$this->out('<success>Data was reindex</success>');
 	}
 
 }
