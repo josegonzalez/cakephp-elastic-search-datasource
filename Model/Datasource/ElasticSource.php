@@ -39,6 +39,20 @@ class ElasticSource extends DataSource {
 	protected $_schema = array();
 
 /**
+ * Prevents error from being thrown in CakeTestFixture
+ *
+ * @var string
+ */
+	public $useNestedTransactions = false;
+
+/**
+* Prevents error from being thrown in CakeTestFixture
+ *
+ * @var string
+ */
+	public $fullDebug = false;
+
+/**
  * Track if we are in a transaction or not - allows saving multiple models to a document
  *
  * @var boolean
@@ -145,7 +159,7 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function listSources() {
-		$sources = null;
+		$sources = array();
 
 		if ($this->_listSources) {
 			$mapping = $this->getMapping();
@@ -246,6 +260,25 @@ class ElasticSource extends DataSource {
 
 		return $this->_delete($type, $id);
 	}
+
+/**
+ * Used by CakeTestFixture to truncate a type
+ *
+ * @param string $type 
+ * @return void
+ * @author David Kullmann
+ */
+	public function truncate($type, $refresh = true) {
+		$query = array(
+			'match_all' => new Object()
+		);
+		$result = $this->_delete($type, null, null, $query);
+		
+		if ($refresh) {
+			$this->post('_refresh');
+		}
+		return $result;
+	}
 	
 	public function query($method, $params, Model $Model) {
 		if ($method === 'scan') {
@@ -262,6 +295,105 @@ class ElasticSource extends DataSource {
 	
 	public function index($type, $id, $document = array()) {
 		return $this->put($type, $id, $document);
+	}
+
+/**
+ * Used by CakeTestFixture to insert many records.
+ *
+ * You should use `index` instead
+ *
+ * @param string $table 
+ * @param array $fields 
+ * @param array $values 
+ * @return void
+ * @author David Kullmann
+ */
+	public function insertMulti($type, $fields, $values, $refresh = true) {
+		$alias = $this->typeToAlias($type);
+		
+		$Model = ClassRegistry::init($alias);
+		
+		$primaryKey = $Model->primaryKey;
+		
+		$documents = array();
+		
+		$results = false;
+		
+		foreach ($values as $value) {
+			$record = array($alias => array_combine($fields, $value));
+			$id = $record[$alias][$primaryKey];
+			$documents[$id] = $record;
+		}
+		
+		if (!empty($documents)) {
+			$results = $this->bulkIndex($type, $documents);
+		}
+		
+		if ($refresh) {
+			$this->post('_refresh');
+		}
+		
+		return $results;
+	}
+
+/**
+ * Convert a pluralized table name (test_models) to an alias (TestModel)
+ *
+ * @param string $table 
+ * @return string
+ * @author David Kullmann
+ */
+	public function typeToAlias($type) {
+		$alias = Inflector::humanize(Inflector::singularize($type));
+		$alias = str_replace(' ', '', $alias);
+		return $alias;
+	}
+
+/**
+ * Create schema, used in testing
+ *
+ * @param string $schema 
+ * @return void
+ * @author David Kullmann
+ */
+	public function createSchema($Schema) {
+		if (!empty($Schema->tables)) {
+			foreach ($Schema->tables as $type => $description) {
+				$alias = $this->typeToAlias($type);
+				
+				if (isset($description['tableParameters'])) {
+					unset($description['tableParameters']);
+				}
+				
+				$properties = $this->_parseDescription(array($alias => $description));
+				$mapping = array($type => compact('properties'));
+				$result = $this->put($type, '_mapping', $mapping);
+				
+				if (!$result) {
+					throw new Exception("createSchema(): Unable to map $type");
+				}
+			}	
+		}
+	}
+
+/**
+ * Drop a schema
+ *
+ * @param string $Schema 
+ * @return void
+ * @author David Kullmann
+ */
+	public function dropSchema($Schema) {
+		if (!empty($Schema->tables)) {
+			foreach ($Schema->tables as $type => $description) {
+				$result = $this->_delete($type);
+				if (!$result) {
+					throw new Exception("dropSchema(): Unable to delete $type");
+				}
+			}
+		}
+		$this->post('_refresh');
+		
 	}
 
 /**
@@ -790,7 +922,9 @@ class ElasticSource extends DataSource {
 				} else {
 					foreach ($types as $type => $models) {
 						foreach ($models['properties'] as $alias => $properties) {
-							$schema[$alias] = $properties['properties'];
+							if (!empty($properties['properties'])) {
+								$schema[$alias] = $properties['properties'];
+							}
 						}
 					}
 				}
@@ -857,9 +991,15 @@ class ElasticSource extends DataSource {
  * @return boolean true if it exists
  * @author David Kullmann
  */
-	public function checkMapping(Model $Model) {
+	public function checkMapping($Model) {
 		
-		$type = $this->getType($Model);
+		if (is_string($Model)) {
+			$type = $Model;
+		} elseif ($Model instanceof Model) {
+			$type = $this->getType($Model);	
+		} else {
+			throw new Exception('checkMapping must be passed a string or a Model instance');
+		}
 		
 		$api = '_mapping';
 
@@ -884,11 +1024,13 @@ class ElasticSource extends DataSource {
 			unset($description);
 			$description = array($alias => $tmp);
 		}
-
-		$properties = $this->_parseDescription($Model, $description);
 		
 		$type = $this->getType($Model);
-		
+
+		$mapping = array($Model->alias => $description);
+
+		$properties = $this->_parseDescription($description, $Model);
+				
 		$mapping = array($type => compact('properties'));
 
 		$result = $this->put($type, '_mapping', $mapping);
@@ -1004,7 +1146,12 @@ class ElasticSource extends DataSource {
 		}
 	}
 
-	public function execute($method, $type, $api, $data = array()) {
+	public function execute($method = null, $type = null, $api = null, $data = array()) {
+			// Being called from Fixture
+			if (is_array($type) && key($type) === 'log') {
+				return true;
+			}
+		
 			$path = array_filter(array($this->config['index'], $type, $api));
 			$path = '/' . implode('/', $path);
 
@@ -1108,7 +1255,7 @@ class ElasticSource extends DataSource {
 							list($alias, $field) = explode('.', $field);
 							$tmp[$alias][$field] = $value;
 						} else {
-							$tmp[$this->currentModel->alias][$field] = $value;
+							$tmp[0][$field] = $value;
 						}
 					}
 				}
@@ -1137,7 +1284,7 @@ class ElasticSource extends DataSource {
  * @return array Array representing ES Mapping
  * @author David Kullmann
  */
-	protected function _parseDescription(Model $Model, $description = array()) {
+	protected function _parseDescription($description = array(), $Model = null) {
 		
 		$properties = array();
 		
@@ -1148,11 +1295,11 @@ class ElasticSource extends DataSource {
 
 				if (is_array($current)) {
 					$properties[$field] = array(
-						'properties' => $this->_parseDescription($Model, $info),
+						'properties' => $this->_parseDescription($info, $Model),
 						'type' => 'object'
 					);
 				} else {
-					if (method_exists($Model, '_esFieldMapping')) {
+					if (is_object($Model) && method_exists($Model, '_esFieldMapping')) {
 						$override = $Model->_esFieldMapping($field);
 					} else {
 						$override = false;
@@ -1214,7 +1361,13 @@ class ElasticSource extends DataSource {
  */
 	public function logQuery($method, $uri, $body, $results = array()) {
 		if (Configure::read('debug')) {
-			$query = strtoupper($method) . ': ' . $this->Http->url($uri) . " $body";
+			$query = sprintf("curl -X%s '%s'",
+				strtoupper($method),
+				$this->Http->url($uri)
+			);
+			if (!empty($body)) {
+				$query .= " -d '$body'";
+			}
 			$took = !empty($results['took']) ? $results['took'] : 0;
 			$affected = !empty($results['hits']['total']) ? $results['hits']['total'] : 0;
 			$numRows = !empty($results['hits']['hits']) ? count($results['hits']['hits']) : 0;
