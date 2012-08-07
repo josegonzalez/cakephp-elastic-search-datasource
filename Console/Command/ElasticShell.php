@@ -4,7 +4,7 @@ App::uses('ConnectionManager', 'Model');
 class ElasticShell extends Shell {
 
 /**
- * Used to track time on indexing
+ * Used to track time on inrindexing
  *
  * @var string
  */
@@ -233,6 +233,18 @@ class ElasticShell extends Shell {
 		$order = array($this->Model->alias.'.'.$field => 'ASC');
 		$contain = false;
 		
+		if(method_exists($this->Model, 'elasticMapping')){
+			$mapping = $this->Model->elasticMapping();
+			$fields = array();
+			foreach($mapping as $model => $map) {
+				foreach ($map as $f => $t) {
+					if($f != 'in_location'){
+						$fields[] = $f;
+					}
+				}
+			}
+		}
+
 		$records = array();
 		
 		$tasks = array(
@@ -255,10 +267,15 @@ class ElasticShell extends Shell {
 				$date = $newDate;
 				$conditions = $this->Model->syncConditions($field, $date, $this->params);
 			}
-
-			$this->_startTimer($tasks['mysql']);
-			$records = $this->Model->find('all', compact('conditions', 'limit', 'page', 'order'));
-			$this->_endTimer($tasks['mysql']);
+			if(isset($fields)){
+				$this->_startTimer($tasks['mysql']);
+				$records = $this->Model->find('all', compact('conditions', 'fields', 'limit', 'page', 'order'));
+				$this->_endTimer($tasks['mysql']);
+			} else {
+				$this->_startTimer($tasks['mysql']);
+				$records = $this->Model->find('all', compact('conditions', 'limit', 'page', 'order'));
+				$this->_endTimer($tasks['mysql']);
+			}
 
 			if (!empty($records)) {
 				
