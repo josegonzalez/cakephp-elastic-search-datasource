@@ -133,8 +133,8 @@ Class IndexableBehavior extends ModelBehavior {
 		foreach ($documents as $document) {
 			if ($geoFields) {
 				$document[$alias][$location] = array(
-					'lat' => $document[$Model->alias][$latitude],
-					'lon' => $document[$Model->alias][$longitude]
+					'lat' => $document[$alias][$latitude],
+					'lon' => $document[$alias][$longitude]
 				);
 			}
 			if ($options['callbacks'] === true || $options['callbacks'] === 'before') {

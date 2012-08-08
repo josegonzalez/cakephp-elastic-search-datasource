@@ -224,6 +224,7 @@ class ElasticShell extends Shell {
 
 		$this->Model->setDataSource('index');
 		$date = $this->Model->lastSync($this->params);
+
 		$this->Model->setDataSource($db_config);
 		
 		$conditions = $this->Model->syncConditions($field, $date, $this->params);
@@ -236,9 +237,17 @@ class ElasticShell extends Shell {
 		if(method_exists($this->Model, 'elasticMapping')){
 			$mapping = $this->Model->elasticMapping();
 			$fields = array();
-			foreach($mapping as $model => $map) {
-				foreach ($map as $f => $t) {
-					if($f != 'in_location'){
+			if(isset($mapping[$this->Model->alias])){
+				foreach ($mapping as $m => $value) {
+					foreach($value as $f => $t){
+						if(!$this->Model->generatedFields || !in_array($f, $this->Model->generatedFields)){
+							$fields[] = $f;
+						}
+					}
+				}
+			} else {
+				foreach($mapping as $f => $t){
+					if(!$this->Model->generatedFields || !in_array($f, $this->Model->generatedFields)){
 						$fields[] = $f;
 					}
 				}
@@ -276,6 +285,13 @@ class ElasticShell extends Shell {
 				$records = $this->Model->find('all', compact('conditions', 'limit', 'page', 'order'));
 				$this->_endTimer($tasks['mysql']);
 			}
+			foreach($records as $x => $record){
+				foreach ($record as $model => $values) {
+					foreach(array_diff_key($values, $mapping[$model]) as $f => $v){
+						unset($records[$x][$model][$f]);
+					}
+				}
+			}
 
 			if (!empty($records)) {
 				
@@ -283,6 +299,7 @@ class ElasticShell extends Shell {
 				$this->Model->setDataSource('index');
 				
 				$this->_startTimer($tasks['saving']);
+
 				if ($fast) {
 					try {
 						$results = $this->Model->index($records);
