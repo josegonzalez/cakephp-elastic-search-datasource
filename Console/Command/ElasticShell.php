@@ -239,9 +239,11 @@ class ElasticShell extends Shell {
 			$fields = array();
 			if(isset($mapping[$this->Model->alias])){
 				foreach ($mapping as $m => $value) {
-					foreach($value as $f => $t){
-						if(!$this->Model->generatedFields || !in_array($f, $this->Model->generatedFields)){
-							$fields[] = $f;
+					if(!$this->Model->notIndexedModels || !in_array($m, $this->Model->notIndexedModels)){
+						foreach($value as $f => $t){
+							if(!$this->Model->generatedFields || !in_array($f, $this->Model->generatedFields)){
+								$fields[] = $f;
+							}
 						}
 					}
 				}
