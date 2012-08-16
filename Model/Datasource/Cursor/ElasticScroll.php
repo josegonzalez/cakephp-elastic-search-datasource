@@ -1,6 +1,6 @@
 <?php
 
-App::uses('ElasticCursor', 'ElasticSearch.Model/Datasource/Cursor');
+App::uses('ElasticCursor', 'Elastic.Model/Datasource/Cursor');
 
 /**
  * An Iterator to scroll results from Elastic Search using an scroll id provided by
