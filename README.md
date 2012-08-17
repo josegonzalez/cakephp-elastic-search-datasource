@@ -257,7 +257,7 @@ from provided lat and long:
 		)
 	));
 
-## Boolean Queries
+### Boolean Queries
 
 Boolean queries are a very powerful tool to filter results based on
 conditions that should be met strictly and others that are just hints or
@@ -275,6 +275,22 @@ conditions that should be met strictly and others that are just hints or
 				array('Model.tags must' => 'source'),
 
 				'Model.readers most_not <' => 100,
+			)
+		)
+	));
+
+### Query String Searches
+
+Should you need searching on multiple fields at the same time using a
+single query string, then use the ``query_string`` key:
+
+	<?php
+	$this->Model->find('all', array(
+		'conditions' => array(
+			'query_string' => array(
+				//Search on both name and description using a boost for name
+				'fields' => array('Model.name^2', 'Model.description'),
+				'query' => 'Text to be looked up'
 			)
 		)
 	));

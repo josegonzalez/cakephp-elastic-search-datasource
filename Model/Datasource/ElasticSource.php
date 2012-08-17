@@ -779,6 +779,10 @@ class ElasticSource extends DataSource {
 			return array(strtolower($key) => $result);
 		}
 
+		if ($key === 'query_string') {
+			return array('query' => array('query_string' => $value));
+		}
+
 		$booleanCheck = explode(' ', trim($key), 2);
 		$operator = trim($operator);
 		$booleanOperator = $operator;
