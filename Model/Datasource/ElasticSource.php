@@ -268,11 +268,10 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function truncate($type, $refresh = true) {
-		$query = array(
-			'match_all' => new Object()
-		);
-		$result = $this->_delete($type, null, null, $query);
-		
+		$mapping = $this->get($type, '_mapping');
+		$result = $this->_delete($type);
+		$result = $result && $this->put($type, '_mapping', $mapping);
+
 		if ($refresh) {
 			$this->post('_refresh');
 		}
