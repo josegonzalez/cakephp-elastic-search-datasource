@@ -220,9 +220,69 @@ Because ElasticSource conforms to the CakePHP ORM CRUD operations are easy:
 	// Delete
 	$this->Model->delete(1);
 
+## Querying
+
+Querying with Elastic Search using this plugin is very simple and you
+will find it is extremely similar to what you are already used to for
+querying relataional databases:
+
+### Simple conditions
+
+Use the Model.field notation followed by an operator:
+
+	<?php
+	$this->Model->find('all', array(
+		'conditions' => array(
+			'Model.name' => 'text', // produces {term: {"Model.name": "text"}}
+			'Model.quantity >' => 10 // produces {range: "Model.quantity": {gt: 10}}, can also use <, <=, >=
+		)
+	));
+
+
+### Distance based geo location queries
+
+The following query will search all results located at most 10 miles
+from provided lat and long:
+
+	<?php
+	$this->Model->find('all', array(
+		'conditions' => array(
+			'Model.location' => array(
+				'distance' => '10mi',
+				'lat' => 10,
+				'lon' => 70
+				'unit' => 'mi' //Optional (also accepts km)
+				'distance_type' => 'arc' // Optional, defaults to plain
+			)
+		)
+	));
+
+## Boolean Queries
+
+Boolean queries are a very powerful tool to filter results based on
+conditions that should be met strictly and others that are just hints or
+"nice to have". Bool queries are created in the following way:
+
+	<?php
+	$this->Model->find('all', array(
+		'conditions' => array(
+			'bool' => array(
+				array('Model.tags should' => 'cakephp'),
+
+				// Multiple conditions per field
+				array('Model.tags must' => 'cakephp'),
+				array('Model.tags must' => 'elastic'),
+				array('Model.tags must' => 'source'),
+
+				'Model.readers most_not <' => 100,
+			)
+		)
+	));
+
+
 ## Additional
 
-Advanced features available using the IndexableBehavior such as geo location searching and sorting
+Advanced features available using the IndexableBehavior such as bound and polygonal geo location searching and sorting
 
 ## Todo
 

@@ -215,7 +215,6 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function read(Model $Model, $queryData = array()) {
-
 		$this->currentModel($Model);
 
 		$query = $this->generateQuery($Model, $queryData);
@@ -764,7 +763,7 @@ class ElasticSource extends DataSource {
 			}
 		}
 		
-		if (in_array($key, array('AND', 'OR', 'NOT'))) {
+		if (in_array(strtolower($key), array('and', 'or', 'not', 'bool'))) {
 			$result = $this->parseConditions($Model, $value);
 			if ($key === 'NOT') {
 				if (count($result) === 1) {
@@ -773,11 +772,22 @@ class ElasticSource extends DataSource {
 					$result = array('and' => $result);
 				}
 			}
+
+			if (strtolower($key) === 'bool') {
+				$result = $this->_normalizeBoolFilter($result);
+			}
 			return array(strtolower($key) => $result);
 		}
 
-		$type = $Model->getColumnType($key);
+		$booleanCheck = explode(' ', trim($key), 2);
+		$operator = trim($operator);
+		$booleanOperator = $operator;
 
+		if (count($booleanCheck) > 1) {
+			list($key, $booleanOperator) = $booleanCheck;
+		}
+
+		$type = $Model->getColumnType($key);
 		if ($value === null) {
 			$filter = $this->missing($key, $value);
 		} else {
@@ -805,7 +815,27 @@ class ElasticSource extends DataSource {
 			}
 		}
 
+		$booleanOperators = array('must', 'must_not', 'should');
+		if (in_array($booleanOperator, $booleanOperators)) {
+			$filter = array($booleanOperator => $filter);
+		}
+
 		return $filter;
+	}
+
+/**
+ * Restructures bool filters so they have the propper formatting for Elastic Search
+ *
+ * @param array $filter single bool filter created by _parseKey
+ * @return array
+ **/
+	protected function _normalizeBoolFilter($filter) {
+		$predicates = array();
+		foreach ($filter as $condition) {
+			$key = key($condition);
+			$predicates[$key][] = current($condition);
+		}
+		return $predicates;
 	}
 
 /**
@@ -858,27 +888,67 @@ class ElasticSource extends DataSource {
 	
 	public function geo($key, $operator, $value) {
 		$return = array();
-		if (is_array($value)) {
-			$isBoundingBox = in_array(key($value), array('top_left', 'bottom_right'));
-			if ($isBoundingBox) {
-				$return = array(
-					'geo_bounding_box' => array(
-						$key => $value
-					)
-				);
-			}
-		} else {
-			$return = array('geo_distance_range' => array(
-				'lte' => $value,
-				$key => array(
-					'lat' => $this->currentModel->latitude,
-					'lon' => $this->currentModel->longitude
-				),
-				'unit' => 'miles',
-				'distance_type' => 'plane'
-			));
+		if (!is_array($value)) {
+			$this->geoDistanceRange($key, $value);
 		}
-		return $return;
+
+		if (isset($value['distance'])) {
+			return $this->geoDistance($key, $value);
+		}
+
+		$boundaries = array('top_left', 'bottom_right');
+		if (in_array(key($value), $boundaries)) {
+			return $this->geoBoundary($key, $value);
+		}
+
+		return array();
+
+	}
+
+/**
+ * Creates filter for a geo boundary box
+ *
+ * @return array
+ **/
+	public function geoBoundary($field, array $boundaries) {
+		return array(
+			'geo_bounding_box' => array(
+				$field => $boundaries
+			)
+		);
+	}
+
+/**
+ * Creates filter for a geo distance search
+ *
+ * @return array
+ **/
+	public function geoDistance($field, array $options) {
+		$valid = array('unit' => 1, 'distance_type' => 1, 'distance' => 1);
+		$opts = array_intersect_key($options, $valid);
+		$opts += array('unit' => 'mi', 'distance_type' => 'plane');
+		return array(
+			'geo_distance' => array(
+				$field => array_diff_key($options, $opts)
+			) + $opts
+		);
+	}
+
+/**
+ * Creates filter for a geo distance range search
+ *
+ * @return array
+ **/
+	public function geoDistanceRange($field, $minDistance) {
+		return array('geo_distance_range' => array(
+			'lte' => $minDistance,
+			$field => array(
+				'lat' => $this->currentModel->latitude,
+				'lon' => $this->currentModel->longitude
+			),
+			'unit' => 'miles',
+			'distance_type' => 'plane'
+		));
 	}
 
 /**
