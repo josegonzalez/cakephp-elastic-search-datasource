@@ -699,7 +699,7 @@ class ElasticSource extends DataSource {
 				$type = $Model->getColumnType($field);
 			}
 
-			if ($alias === $Model->alias && $Model->useType !== $alias) {
+			if ($alias === $Model->alias && !empty($model->useType) && $Model->useType !== $alias) {
 				$alias =  $Model->useType;
 			}
 
