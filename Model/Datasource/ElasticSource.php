@@ -799,7 +799,7 @@ class ElasticSource extends DataSource {
 					$filter = $this->range($key, $operator, (float)$value);
 					break;
 				case 'integer':
-					$value = (integer)$value;
+					$value = is_array($value) ? $value : (integer)$value;
 				case 'date':
 					$filter = $this->range($key, $operator, $value);
 					break;				
