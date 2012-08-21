@@ -689,14 +689,18 @@ class ElasticSource extends DataSource {
 			$alias = $Model->alias;
 
 			if (strpos($field, '.')) {
-				list($alias, $field) = explode('.', $field);
+				list($_alias, $_field) = explode('.', $field, 2);
+				if (ctype_upper($_alias[0])) {
+					$alias = $_alias;
+					$field = $_field;
+				}
 			}
 
 			if ($alias !== $Model->alias) {
 				$aliasModel = ClassRegistry::init($alias);
-				$type = $aliasModel->getColumnType($field);
+				$type = $this->getColumnType($aliasModel, $field);
 			} else {
-				$type = $Model->getColumnType($field);
+				$type = $this->getColumnType($Model, $field);
 			}
 
 			if ($alias === $Model->alias && !empty($model->useType) && $Model->useType !== $alias) {
@@ -707,7 +711,7 @@ class ElasticSource extends DataSource {
 				case 'geo_point':
 					$results[] = array(
 						'_geo_distance' => array(
-							implode('.', array($alias, $field)) => array(
+							$alias . '.' . $field => array(
 								'lat' => $query['latitude'],
 								'lon' => $query['longitude']
 							),
@@ -717,10 +721,10 @@ class ElasticSource extends DataSource {
 					);
 					break;
 				default:
-					$results[] = array($alias.'.'.$field => array('order' => strtolower($direction)));
+					$results[] = array($alias . '.' . $field => array('order' => strtolower($direction)));
 			}
 		}
-		
+
 		return $results;
 	}
 
@@ -790,7 +794,7 @@ class ElasticSource extends DataSource {
 			list($key, $booleanOperator) = $booleanCheck;
 		}
 
-		$type = $Model->getColumnType($key);
+		$type = $this->getColumnType($Model, $key);
 		if ($value === null) {
 			$filter = $this->missing($key, $value);
 		} else {
@@ -802,7 +806,7 @@ class ElasticSource extends DataSource {
 					$value = is_array($value) ? $value : (integer)$value;
 				case 'date':
 					$filter = $this->range($key, $operator, $value);
-					break;				
+					break;
 				case 'multi_field':
 				case 'string':
 					$filter = $this->term($key, $operator, $value);
@@ -1009,14 +1013,41 @@ class ElasticSource extends DataSource {
 /**
  * Get the useType if its set, otherwise use the table name
  *
- * @param Model $Model 
+ * @param Model $Model
  * @return void
  * @author David Kullmann
  */
 	public function getType(Model $Model) {
 		return !empty($Model->useType) ? $Model->useType : $Model->useTable;
 	}
-	
+
+/**
+ * Returns the column type of a column in the model.
+ * according to its mapping.
+ *
+ * @param Model $model instance to be inspected
+ * @param string $column The name of the model column
+ * @return string Column type
+ */
+	public function getColumnType($model, $column) {
+		$cols = $model->schema();
+		$parts = explode('.', $column);
+		if (current($parts) === $model->alias) {
+			array_shift($parts);
+		}
+		$pointer =& $cols;
+		foreach ($parts as $part) {
+			if (isset($pointer[$part])) {
+				$pointer =& $pointer[$part];
+			} else if (isset($pointer['properties'][$part])) {
+				$pointer =& $pointer['properties'][$part];
+			} else {
+				return $model->getColumnType($column);
+			}
+		}
+		return $pointer['type'];
+	}
+
 	public function createIndex($index, $alias = false) {
 		$type = 'put';
 		$api = $index;
