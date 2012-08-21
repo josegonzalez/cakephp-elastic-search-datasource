@@ -11,9 +11,9 @@ App::uses('ElasticScroll', 'ElasticSearch.Model/Datasource/Cursor');
  * @author David Kullmann
  */
 class MissingIndexException extends CakeException {
-	
+
 	protected $_messageTemplate = 'Index "%s" is missing.';
-	
+
 }
 
 /**
@@ -93,7 +93,7 @@ class ElasticSource extends DataSource {
  * @var boolean
  */
 	protected $_listSources = false;
-	
+
 /**
  * Query log
  *
@@ -136,19 +136,19 @@ class ElasticSource extends DataSource {
 			$mapping = $this->getMapping();
 			$this->_schema = $this->parseMapping($mapping);
 		}
-		
+
 		if (empty($this->_schema[$Model->alias][$Model->primaryKey])) {
 			$this->_schema[$Model->alias][$Model->primaryKey] = array('type' => 'string', 'length' => 255);
 		} elseif (!empty($this->_schema[$Model->alias][$Model->primaryKey]['type'])) {
 			if (empty($this->_schema[$Model->alias][$Model->primaryKey]['length'])) {
 				if ($this->_schema[$Model->alias][$Model->primaryKey]['type'] === 'string') {
-					$this->_schema[$Model->alias][$Model->primaryKey]['length'] = 255; 
+					$this->_schema[$Model->alias][$Model->primaryKey]['length'] = 255;
 				} elseif ($this->_schema[$Model->alias][$Model->primaryKey]['type'] === 'integer') {
 					$this->_schema[$Model->alias][$Model->primaryKey]['length'] = 11;
 				}
 			}
 		}
-		
+
 		return $this->_schema[$Model->alias];
 	}
 
@@ -167,9 +167,9 @@ class ElasticSource extends DataSource {
 		}
 		return $sources;
 	}
-	
+
 	public function calculate(Model $Model, $func, $params = null) {
-		
+
 	}
 
 /**
@@ -196,11 +196,11 @@ class ElasticSource extends DataSource {
 		}
 
 		$id = $this->_findKey($Model, $document);
-		
+
 		if (!$id) {
 			throw new Exception('ElasticSource requires a primary key to index a document');
 		}
-		
+
 		$results = $this->index($this->getType($Model), $id, $document);
 
 		return $results;
@@ -234,7 +234,7 @@ class ElasticSource extends DataSource {
 		}
 		return $results;
 	}
-	
+
 	public function update(Model $Model, $fields = array(), $values = array()) {
 		return $this->create($Model, $fields, $values);
 	}
@@ -253,7 +253,7 @@ class ElasticSource extends DataSource {
 		} else {
 			$record = $Model->findById($Model->id);
 		}
-		
+
 		$id = $record[$Model->alias][$Model->primaryKey];
 		$type = $this->getType($Model);
 
@@ -277,7 +277,7 @@ class ElasticSource extends DataSource {
 		}
 		return $result;
 	}
-	
+
 	public function query($method, $params, Model $Model) {
 		if ($method === 'scan') {
 			return call_user_func_array(array($this, $method), array_merge(array($Model), $params));
@@ -286,11 +286,11 @@ class ElasticSource extends DataSource {
 			$type = $matches[1] === 'All' ? 'all' : 'first';
 			$conditions = array( strtolower($matches[2]) => $params );
 			return $Model->find($type, compact('conditions'));
-			
+
 		}
 		throw new Exception ('Cannot call method ' . $method . ' on ElasticSource');
 	}
-	
+
 	public function index($type, $id, $document = array()) {
 		return $this->put($type, $id, $document);
 	}
@@ -391,7 +391,7 @@ class ElasticSource extends DataSource {
 			}
 		}
 		$this->post('_refresh');
-		
+
 	}
 
 /**
@@ -403,15 +403,15 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function bulkIndex($type = null, $documents = array()) {
-		
+
 		$json = array();
-		
+
 		foreach ($documents as $id => $document) {
 			$command = array('index' => array('_index' => $this->config['index'], '_type' => $type, '_id' => $id));
 			$json[] = json_encode($command);
 			$json[] = json_encode($document);
 		}
-		
+
 		$json = implode("\n", $json) . "\n";
 
 		return $this->post($type, '_bulk', $json, false);
@@ -532,7 +532,7 @@ class ElasticSource extends DataSource {
 	public function allDocuments() {
 		return $this->_document;
 	}
-	
+
 
 
 /**
@@ -545,10 +545,10 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _setupTransaction(Model $Model, $document = array()) {
-		
+
 		$id = $this->_findKey($Model, $document);
 		$type = $this->getType($Model);
-		
+
 		if (empty($this->_type) && empty($this->_id) && $id) {
 			$this->_type = $type;
 			$this->_id   = $id;
@@ -557,7 +557,7 @@ class ElasticSource extends DataSource {
 			$this->_document[$id] = array();
 			$this->_id = $id;
 		}
-		
+
 		return true;
 	}
 
@@ -569,7 +569,7 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function generateQuery(Model $Model, $queryData = array()) {
-		
+
 		$queryKeys = array(
 			'conditions' => 'filter',
 			'limit' => 'size',
@@ -581,44 +581,44 @@ class ElasticSource extends DataSource {
 		);
 
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
-		
+
 		$queryData['conditions'] = $this->afterParseConditions($Model, $queryData['conditions']);
 
 		if (is_string($queryData['conditions'])) {
 			return $queryData['conditions'];
 		}
-		
+
 		$queryData['order'] = $this->parseOrder($Model, $queryData);
 
 		$query = array();
-		
+
 		if (empty($queryData['limit'])) {
 			$queryData['limit'] = 10;
 		}
-		
+
 		if($queryData['page'] === 1) {
 			$queryData['page'] = 0;
 		} else {
 			$queryData['page'] = $queryData['page'] * $queryData['limit'];
 		}
-		
+
 		foreach ($queryKeys as $old => $new) {
 			$query[$new] = empty($queryData[$old]) ? null : $queryData[$old];
 		}
-		
+
 		$query['type'] = $this->parseQueryType($query);
-		
+
 		$query['query'] = empty($query['query']) ? array('match_all' => new Object()) : $query['query'];
 
 		extract($query);
-		
+
 		if ($type !== 'query') {
 			$query = array($type => compact('query', 'filter'));
 		}
 
 
 		$query = compact('query', 'size', 'sort', 'from', 'fields', 'facets');
-				
+
 		$query = Set::filter($query);
 
 		if ($Model->findQueryType === 'count') {
@@ -627,7 +627,7 @@ class ElasticSource extends DataSource {
 
 		return $query;
 	}
-	
+
 	public function parseQueryType($query) {
 		$type = 'filtered';
 		if (!empty($query['type'])) {
@@ -665,21 +665,21 @@ class ElasticSource extends DataSource {
 
 		return $filters;
 	}
-	
+
 	public function parseOrder(Model $Model, $query = array()) {
-		
+
 		$results = array();
-		
+
 		$order = $query['order'];
-		
+
 		foreach ($order as $key => $value) {
-			
+
 			if ($key === 0 && empty($value)) {
 				return false;
 			}
-			
+
 			$direction = 'asc';
-			
+
 			if (is_string($value)) {
 			} elseif (is_array($value)) {
 				$field = key($value);
@@ -744,7 +744,7 @@ class ElasticSource extends DataSource {
 		}
 
 		$filter = array();
-		
+
 		$operatorMatch = '/^(((' . implode(')|(', $this->_filterOps);
 		$operatorMatch .= ')\\x20?)|<[>=]?(?![^>]+>)\\x20?|[>=!]{1,3}(?!<)\\x20?)/is';
 		$bound = (strpos($key, '?') !== false || (is_array($value) && strpos($key, ':') !== false));
@@ -761,7 +761,7 @@ class ElasticSource extends DataSource {
 				$key = substr($key, 0, $split);
 			}
 		}
-		
+
 		if (in_array(strtolower($key), array('and', 'or', 'not', 'bool'))) {
 			$result = $this->parseConditions($Model, $value);
 			if ($key === 'NOT') {
@@ -862,11 +862,11 @@ class ElasticSource extends DataSource {
 		}
 		return $filters;
 	}
-	
+
 	public function missing($key, $value) {
 		return array('missing' => array('field' => $key));
 	}
-	
+
 	public function term($key, $operator, $value) {
 		$type = 'term';
 		if (is_array($value) && count($value) > 1) {
@@ -874,7 +874,7 @@ class ElasticSource extends DataSource {
 		}
 		return array($type => array($key => $value));
 	}
-	
+
 	public function range($key, $operator, $value) {
 		if ($operator === '=') {
 			return $this->term($key, $operator, $value);
@@ -888,7 +888,7 @@ class ElasticSource extends DataSource {
 		$operator = $rangeOperators[$operator];
 		return array('range' => array($key => array($operator => $value)));
 	}
-	
+
 	public function geo($key, $operator, $value) {
 		$return = array();
 		if (!is_array($value)) {
@@ -1024,7 +1024,7 @@ class ElasticSource extends DataSource {
 
 		$tmp = $this->config['index'];
 		$this->config['index'] = null;
-		
+
 		if ($alias) {
 			$type = 'post';
 			$api = '_aliases';
@@ -1043,12 +1043,12 @@ class ElasticSource extends DataSource {
 				throw $e;
 			}
 		}
-	
+
 		$this->config['index'] = $tmp;
-	
+
 		return $return;
 	}
-	
+
 	public function dropIndex($index) {
 		$tmp = $this->config['index'];
 		$this->config['index'] = $index;
@@ -1097,13 +1097,13 @@ class ElasticSource extends DataSource {
 			unset($description);
 			$description = array($alias => $tmp);
 		}
-		
+
 		$type = $this->getType($Model);
 
 		$mapping = array($Model->alias => $description);
 
 		$properties = $this->_parseDescription($description, $Model);
-				
+
 		$mapping = array($type => compact('properties'));
 
 		$result = $this->put($type, '_mapping', $mapping);
@@ -1193,11 +1193,11 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function __call($method, $arguments) {
-		
+
 		$method = $method === '_delete' ? 'delete' : $method;
-		
+
 		if (method_exists($this->Http, $method)) {
-			
+
 			if (isset($arguments[3]) && $arguments[3] === false) {
 				$encode = false;
 			} else {
@@ -1224,7 +1224,7 @@ class ElasticSource extends DataSource {
 			if (is_array($type) && key($type) === 'log') {
 				return true;
 			}
-		
+
 			$path = array_filter(array($this->config['index'], $type, $api));
 			$path = '/' . implode('/', $path);
 
@@ -1277,9 +1277,9 @@ class ElasticSource extends DataSource {
 		if (empty($response->body)) {
 			throw new Exception('Missing response');
 		}
-		
+
 		$body = json_decode($response['body']);
-		
+
 		if (!empty($body->items)) {
 			foreach ($body->items as $item) {
 				if (!empty($item->index->error)) {
@@ -1287,7 +1287,7 @@ class ElasticSource extends DataSource {
 				}
 			}
 		}
-		
+
 		if (!empty($body->error)) {
 			return $this->_throwError($body);
 		}
@@ -1335,7 +1335,7 @@ class ElasticSource extends DataSource {
 				if (empty($tmp[$this->currentModel->alias][$this->currentModel->primaryKey])) {
 					$tmp[$this->currentModel->alias][$this->currentModel->primaryKey] = $result['_id'];
 				}
-				
+
 				$result = $tmp;
 			}
 			return $results['hits']['hits'];
@@ -1353,14 +1353,14 @@ class ElasticSource extends DataSource {
 /**
  * Recursive method to map a SQL-like model description into a ElasticSearch one
  *
- * @param array $description 
+ * @param array $description
  * @return array Array representing ES Mapping
  * @author David Kullmann
  */
 	protected function _parseDescription($description = array(), $Model = null) {
-		
+
 		$properties = array();
-		
+
 		foreach ($description as $field => $info) {
 			if (is_array($info)) {
 
@@ -1389,14 +1389,14 @@ class ElasticSource extends DataSource {
 								}
 							}
 						}
-						
+
 					}
 				}
 			}
 		}
-		
-	 	return $properties;
-		
+
+		return $properties;
+
 	}
 
 /**
@@ -1414,7 +1414,7 @@ class ElasticSource extends DataSource {
 		if (in_array($attr, $notUsed)) {
 			return false;
 		}
-		
+
 		if ($attr === 'type' && $val === 'datetime') {
 			$val = 'date';
 		}
@@ -1445,7 +1445,7 @@ class ElasticSource extends DataSource {
 			$affected = !empty($results['hits']['total']) ? $results['hits']['total'] : 0;
 			$numRows = !empty($results['hits']['hits']) ? count($results['hits']['hits']) : 0;
 			$log = compact('query', 'affected', 'numRows', 'took');
-			
+
 			return $this->_addLog($log);
 		}
 		return true;
