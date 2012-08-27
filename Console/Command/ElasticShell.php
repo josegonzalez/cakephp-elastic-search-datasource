@@ -1,7 +1,7 @@
 <?php
 App::uses('ConnectionManager', 'Model');
 
-class ElasticShell extends Shell {
+class ElasticShell extends AppShell {
 
 /**
  * Used to track time on indexing
