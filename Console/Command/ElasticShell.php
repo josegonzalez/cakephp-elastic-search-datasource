@@ -13,7 +13,7 @@ class ElasticShell extends Shell {
 /**
  * Start the timer for a task
  *
- * @param string $taskId 
+ * @param string $taskId
  * @return void
  * @author David Kullmann
  */
@@ -24,7 +24,7 @@ class ElasticShell extends Shell {
 /**
  * End a timer for a task and print the output if --verbose
  *
- * @param string $taskId 
+ * @param string $taskId
  * @return $float the time this task took
  * @author David Kullmann
  */
@@ -127,11 +127,11 @@ class ElasticShell extends Shell {
  */
 	public function create_index() {
 		extract($this->params);
-		
+
 		$index = $this->args[0];
-		
+
 		$ds = ConnectionManager::getDataSource($this->params['connection']);
-		
+
 		$action = 'created';
 		$alias = empty($this->params['alias']) ? false : $this->params['alias'];
 		try {
@@ -146,7 +146,7 @@ class ElasticShell extends Shell {
 			$this->out("<error>$message</error>");
 			exit;
 		}
-		
+
 		if ($result) {
 			if ($alias) {
 				$this->out("Successfully aliased $alias to $index");
@@ -166,16 +166,16 @@ class ElasticShell extends Shell {
  */
 	public function mapping() {
 		extract($this->params);
-		
+
 		$model = $this->args[0];
-		
+
 		$this->Model = $this->_getModel($model);
-		
+
 		if (get_class($this->Model) === 'AppModel') {
 			$this->out("<error>Couldn't load model $model</warning>");
 			exit;
 		}
-		
+
 		$ds = ConnectionManager::getDataSource($this->params['connection']);
 		$mapped = $ds->checkMapping($this->Model);
 
@@ -188,13 +188,13 @@ class ElasticShell extends Shell {
 				} else {
 					$mapping = $ds->describe($this->Model);
 				}
-				
+
 				if (!empty($mapping)) {
 					$ds->mapModel($this->Model, $mapping);
 				} else {
 					$this->out("Unable to find mapping for $model");
 				}
-				
+
 			} else {
 				$this->out($this->Model->alias . ' already mapped');
 			}
@@ -203,18 +203,18 @@ class ElasticShell extends Shell {
 				$this->out('Mapping does not exist yet');
 			} else {
 				$return = $ds->dropMapping($this->Model);
-				
+
 				if ($return) {
 					$this->out("<info>Mapping for " . $this->Model->alias . ' has been dropped</info>');
 				}
-				
+
 			}
 		} elseif ($action === 'check') {
 			$exists = $mapped ? '<info>exists</info>' : '<warning>does not exist</warning>';
 			$this->out("Mapping for " . $this->Model->alias . ' ' . $exists);
 		}
 	}
-	
+
 	public function list_sources() {
 
 		$ds = ConnectionManager::getDataSource('index');
@@ -229,43 +229,43 @@ class ElasticShell extends Shell {
 			$this->out('<warning>listSources did not return any sources</warning> This could be OK');
 		}
 	}
-	
+
 	protected function _getModel($modelName) {
 		return ClassRegistry::init($modelName);
 	}
-	
+
 	public function index() {
-		
+
 		extract($this->params);
 
 		$model = $this->args[0];
-		
+
 		$this->Model = $this->_getModel($model);
 
 		if (!$this->Model->Behaviors->attached('Indexable')) {
 			$this->Model->Behaviors->load('Elastic.Indexable');
 		}
-		
+
 		list($alias, $field) = $this->Model->getModificationField();
 
 		$this->Model->setDataSource('index');
 		$date = $this->Model->lastSync($this->params);
 		$this->Model->setDataSource($db_config);
-		
+
 		$conditions = $this->Model->syncConditions($field, $date, $this->params);
-		
+
 		$this->out('Retrieving data from mysql starting on ' . $date);
-		
+
 		$order = array($this->Model->alias.'.'.$field => 'ASC');
 		$contain = false;
-		
+
 		$records = array();
-		
+
 		$tasks = array(
 			'mysql' => 'Retrieving MySQL records',
 			'saving' => 'Saving to ElasticSearch'
 		);
-		
+
 		// Incase you have a zillion records we don't use pagination because of
 		// issues w/how MySQL does pagination. This will paginate properly even
 		// if many models have the same value in the modification field
@@ -287,10 +287,10 @@ class ElasticShell extends Shell {
 			$this->_endTimer($tasks['mysql']);
 
 			if (!empty($records)) {
-				
+
 				$this->Model->create();
 				$this->Model->setDataSource('index');
-				
+
 				$this->_startTimer($tasks['saving']);
 				if ($fast) {
 					try {
@@ -311,9 +311,9 @@ class ElasticShell extends Shell {
 				}
 
 			}
-			
+
 			$this->Model->setDataSource($db_config);
-			
+
 		} while (!empty($records));
 
 	}
@@ -325,33 +325,33 @@ class ElasticShell extends Shell {
  * @author David Kullmann
  */
 	public function find_mapping_errors() {
-		
+
 		extract($this->params);
-		
+
 		$errors = false;
-		
+
 		if ($reset) {
 			$this->params['action'] = 'drop';
 			$this->mapping();
 			$this->params['action'] = 'create';
 			$this->mapping();
 		}
-		
+
 		$this->Model = $this->_getModel($model);
 
 		$record = $this->Model->find('first');
-		
+
 		$this->Model->setDataSource('index');
-				
+
 		try {
 			$results = $this->Model->saveAll($record);
 		} catch (Exception $e) {
 			$errors = true;
 			$message = $e->getMessage();
 			$this->out($message);
-			
+
 			$testField = array();
-			
+
 			foreach($record as $alias => $data) {
 				foreach ($data as $key => $value) {
 					$failed = false;
@@ -372,9 +372,9 @@ class ElasticShell extends Shell {
 				}
 			}
 		}
-		
+
 		if (!$errors) {
-			$this->out('No mapping errors found');	
+			$this->out('No mapping errors found');
 		}
 	}
 
