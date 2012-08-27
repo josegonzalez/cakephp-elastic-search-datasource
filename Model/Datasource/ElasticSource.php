@@ -1067,6 +1067,8 @@ class ElasticSource extends DataSource {
 		try {
 			$return = $this->{$type}(null, $api, $body);
 		} catch (Exception $e) {
+			$this->config['index'] = $tmp;
+
 			$message = $e->getMessage();
 			if (preg_match('/IndexAlreadyExistsException/', $message)) {
 				throw new Exception("ElasticSearch index '$index' already exists");
