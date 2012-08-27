@@ -108,7 +108,7 @@ class ElasticSource extends DataSource {
 /**
  * Constructor, call the parent and setup Http
  *
- * @param array $config 
+ * @param array $config
  * @author David Kullmann
  */
 	public function __construct($config = array()) {
@@ -127,7 +127,7 @@ class ElasticSource extends DataSource {
 /**
  * Describe a model based on it's mapping
  *
- * @param Model $Model 
+ * @param Model $Model
  * @return array Schema
  * @author David Kullmann
  */
@@ -178,12 +178,12 @@ class ElasticSource extends DataSource {
  *
  * The first model to be saved in the transaction determines the type, and if more than one set of models (saveMany)
  * are being saved then they will be stored and saved in bulk
- * 
+ *
  * Otherwise simply index the model data given based on it's type and Id
  *
- * @param Model $Model 
- * @param array $fields 
- * @param array $values 
+ * @param Model $Model
+ * @param array $fields
+ * @param array $values
  * @return mixed boolean or array of model data
  * @author David Kullmann
  */
@@ -209,8 +209,8 @@ class ElasticSource extends DataSource {
 /**
  * Query ElasticSearch to retrieve records
  *
- * @param Model $Model 
- * @param array $queryData 
+ * @param Model $Model
+ * @param array $queryData
  * @return mixed boolean false on failure or array of records on success
  * @author David Kullmann
  */
@@ -242,8 +242,8 @@ class ElasticSource extends DataSource {
 /**
  * Delete a record
  *
- * @param Model $Model 
- * @param array $conditions 
+ * @param Model $Model
+ * @param array $conditions
  * @return boolean True on success
  * @author David Kullmann
  */
@@ -263,7 +263,7 @@ class ElasticSource extends DataSource {
 /**
  * Used by CakeTestFixture to truncate a type
  *
- * @param string $type 
+ * @param string $type
  * @return void
  * @author David Kullmann
  */
@@ -300,44 +300,44 @@ class ElasticSource extends DataSource {
  *
  * You should use `index` instead
  *
- * @param string $table 
- * @param array $fields 
- * @param array $values 
+ * @param string $table
+ * @param array $fields
+ * @param array $values
  * @return void
  * @author David Kullmann
  */
 	public function insertMulti($type, $fields, $values, $refresh = true) {
 		$alias = $this->typeToAlias($type);
-		
+
 		$Model = ClassRegistry::init($alias);
-		
+
 		$primaryKey = $Model->primaryKey;
-		
+
 		$documents = array();
-		
+
 		$results = false;
-		
+
 		foreach ($values as $value) {
 			$record = array($alias => array_combine($fields, $value));
 			$id = $record[$alias][$primaryKey];
 			$documents[$id] = $record;
 		}
-		
+
 		if (!empty($documents)) {
 			$results = $this->bulkIndex($type, $documents);
 		}
-		
+
 		if ($refresh) {
 			$this->post('_refresh');
 		}
-		
+
 		return $results;
 	}
 
 /**
  * Convert a pluralized table name (test_models) to an alias (TestModel)
  *
- * @param string $table 
+ * @param string $table
  * @return string
  * @author David Kullmann
  */
@@ -350,7 +350,7 @@ class ElasticSource extends DataSource {
 /**
  * Create schema, used in testing
  *
- * @param string $schema 
+ * @param string $schema
  * @return void
  * @author David Kullmann
  */
@@ -358,26 +358,26 @@ class ElasticSource extends DataSource {
 		if (!empty($Schema->tables)) {
 			foreach ($Schema->tables as $type => $description) {
 				$alias = $this->typeToAlias($type);
-				
+
 				if (isset($description['tableParameters'])) {
 					unset($description['tableParameters']);
 				}
-				
+
 				$properties = $this->_parseDescription(array($alias => $description));
 				$mapping = array($type => compact('properties'));
 				$result = $this->put($type, '_mapping', $mapping);
-				
+
 				if (!$result) {
 					throw new Exception("createSchema(): Unable to map $type");
 				}
-			}	
+			}
 		}
 	}
 
 /**
  * Drop a schema
  *
- * @param string $Schema 
+ * @param string $Schema
  * @return void
  * @author David Kullmann
  */
@@ -397,8 +397,8 @@ class ElasticSource extends DataSource {
 /**
  * Bulk index a group of models
  *
- * @param string $type 
- * @param array $documents 
+ * @param string $type
+ * @param array $documents
  * @return boolean true on success
  * @author David Kullmann
  */
@@ -420,7 +420,7 @@ class ElasticSource extends DataSource {
 /**
  * Get/set the current model - called when requests are starting
  *
- * @param Model $Model 
+ * @param Model $Model
  * @return Model the current model
  * @author David Kullmann
  */
@@ -434,7 +434,7 @@ class ElasticSource extends DataSource {
 /**
  * Check to see if we are in a transacion
  *
- * @param string $document 
+ * @param string $document
  * @return void
  * @author David Kullmann
  */
@@ -485,7 +485,7 @@ class ElasticSource extends DataSource {
 	}
 
 /**
- * Reset our transaction state, document, id, and type 
+ * Reset our transaction state, document, id, and type
  *
  * @return void
  * @author David Kullmann
@@ -502,8 +502,8 @@ class ElasticSource extends DataSource {
  *
  * Allows saveAssociated to work and allows storing multiple models in one document
  *
- * @param Model $Model 
- * @param array $document 
+ * @param Model $Model
+ * @param array $document
  * @return boolean true
  * @author David Kullmann
  */
@@ -539,8 +539,8 @@ class ElasticSource extends DataSource {
  * If we are in a new transaction, set _type and _id, if we are in an existing
  * transaction then start a new document and set _id
  *
- * @param Model $Model 
- * @param array $document 
+ * @param Model $Model
+ * @param array $document
  * @return void
  * @author David Kullmann
  */
@@ -564,7 +564,7 @@ class ElasticSource extends DataSource {
 /**
  * Generate an ElasticSearch query from Cake's ORM $queryData
  *
- * @param array $queryData 
+ * @param array $queryData
  * @return array Array that can be converted to JSON for ElasticSearch
  * @author David Kullmann
  */
@@ -646,7 +646,7 @@ class ElasticSource extends DataSource {
 /**
  * Parse the 'conditions' key of a query from CakePHP's ORM
  *
- * @param array $conditions 
+ * @param array $conditions
  * @return array Array of filters for ElasticSearch
  * @author David Kullmann
  */
@@ -731,8 +731,8 @@ class ElasticSource extends DataSource {
 /**
  * Used to parse a key for ElasticSearch filters
  *
- * @param string $key 
- * @param mixed $value 
+ * @param string $key
+ * @param mixed $value
  * @return array ElasticSearch compatible filter
  * @author David Kullmann
  */
@@ -850,11 +850,11 @@ class ElasticSource extends DataSource {
  * we have to perform this check in a separate method (or use a static variable or whatever, but,
  * I think this is cleaner)
  *
- * @param string $Model 
- * @param array $filters 
+ * @param string $Model
+ * @param array $filters
  * @return array
  * @author David Kullmann
- */	
+ */
 	public function afterParseConditions(Model $Model, $filters = array()) {
 		if (count($filters) > 1) {
 			$filters = array('and' => $filters);
@@ -961,8 +961,8 @@ class ElasticSource extends DataSource {
 /**
  * Find the key for this document
  *
- * @param Model $Model 
- * @param array $document 
+ * @param Model $Model
+ * @param array $document
  * @return mixed Boolean false if no key is present, otherwise the key (string/int)
  * @author David Kullmann
  */
@@ -986,7 +986,7 @@ class ElasticSource extends DataSource {
 /**
  * Parse an entire index mapping to create the schema for this datasource
  *
- * @param array $mapping 
+ * @param array $mapping
  * @return array CakePHP schema
  * @author David Kullmann
  */
@@ -1091,32 +1091,32 @@ class ElasticSource extends DataSource {
 /**
  * Check to see if a mapping exists
  *
- * @param Model $Model 
+ * @param Model $Model
  * @return boolean true if it exists
  * @author David Kullmann
  */
 	public function checkMapping($Model) {
-		
+
 		if (is_string($Model)) {
 			$type = $Model;
 		} elseif ($Model instanceof Model) {
-			$type = $this->getType($Model);	
+			$type = $this->getType($Model);
 		} else {
 			throw new Exception('checkMapping must be passed a string or a Model instance');
 		}
-		
+
 		$api = '_mapping';
 
 		$mappings = $this->get(null, $api);
-		
+
 		return !empty($mappings[$this->config['index']][$type]);
 	}
 
 /**
  * Map a model based on it's description from MySQL (or your own)
  *
- * @param Model $Model 
- * @param array $description 
+ * @param Model $Model
+ * @param array $description
  * @return boolean true on success
  * @author David Kullmann
  */
@@ -1145,7 +1145,7 @@ class ElasticSource extends DataSource {
 /**
  * Delete a mapping
  *
- * @param Model $Model 
+ * @param Model $Model
  * @return boolean true on success
  * @author David Kullmann
  */
@@ -1216,8 +1216,8 @@ class ElasticSource extends DataSource {
 /**
  * Call HttpSocket methods
  *
- * @param string $method 
- * @param array $arguments 
+ * @param string $method
+ * @param array $arguments
  * @return mixed Results from HttpSocket calls parsed by _parseResponse and _filterResults
  * @see ElasticSource::_parseResponse()
  * @see ElasticSource::_filterResults()
@@ -1234,10 +1234,10 @@ class ElasticSource extends DataSource {
 			} else {
 				$encode = true;
 			}
-			
+
 			$type    = !empty($arguments[0]) ? $arguments[0] : null;
 			$api     = !empty($arguments[1]) ? $arguments[1] : null;
-			
+
 			if (!empty($arguments[2])) {
 				$body = $encode ? json_encode($arguments[2]) : $arguments[2];
 			} else {
@@ -1286,8 +1286,8 @@ class ElasticSource extends DataSource {
 /**
  * Get the URI for a request
  *
- * @param array $config HttpSocket $config style array 
- * @return array Array compatible with HttpSocket $uri for get/post/put/delete 
+ * @param array $config HttpSocket $config style array
+ * @return array Array compatible with HttpSocket $uri for get/post/put/delete
  * @author David Kullmann
  */
 	protected function _uri($config) {
@@ -1299,7 +1299,7 @@ class ElasticSource extends DataSource {
 /**
  * Parse the response from ElasticSearch, throwing errors if necessary
  *
- * @param CakeResponse $response 
+ * @param CakeResponse $response
  * @return mixed boolean true or false, or body of request as array
  * @author David Kullmann
  */
@@ -1332,7 +1332,7 @@ class ElasticSource extends DataSource {
 /**
  * Filter results from a call, parsing out the records
  *
- * @param array $results 
+ * @param array $results
  * @return array Array of results
  * @author David Kullmann
  */
@@ -1433,8 +1433,8 @@ class ElasticSource extends DataSource {
 /**
  * Convert MySQL or CakePHP ORM field attributes into ElasticSearch compatible attributes
  *
- * @param string $attr 
- * @param string $val 
+ * @param string $attr
+ * @param string $val
  * @return string ES compatible attribute
  * @author David Kullmann
  */
@@ -1456,10 +1456,10 @@ class ElasticSource extends DataSource {
 /**
  * Log a new query if debug is on
  *
- * @param string $method 
- * @param string $uri 
- * @param string $body 
- * @param string $results 
+ * @param string $method
+ * @param string $uri
+ * @param string $body
+ * @param string $results
  * @return void
  * @author David Kullmann
  */
@@ -1495,7 +1495,7 @@ class ElasticSource extends DataSource {
 /**
  * Added an item to the query log
  *
- * @param string $data 
+ * @param string $data
  * @return void
  * @author David Kullmann
  */
@@ -1514,7 +1514,7 @@ class ElasticSource extends DataSource {
 /**
  * Throw the right error
  *
- * @param string $info 
+ * @param string $info
  * @return void
  * @author David Kullmann
  */
