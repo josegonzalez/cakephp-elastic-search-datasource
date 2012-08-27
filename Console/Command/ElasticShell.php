@@ -144,7 +144,7 @@ class ElasticShell extends AppShell {
 		} catch (Exception $e) {
 			$message = $e->getMessage();
 			$this->out("<error>$message</error>");
-			exit;
+			return false;
 		}
 
 		if ($result) {
@@ -173,7 +173,7 @@ class ElasticShell extends AppShell {
 
 		if (get_class($this->Model) === 'AppModel') {
 			$this->out("<error>Couldn't load model $model</warning>");
-			exit;
+			return false;
 		}
 
 		$ds = ConnectionManager::getDataSource($this->params['connection']);
@@ -365,7 +365,7 @@ class ElasticShell extends AppShell {
 					}
 					if (!$failed) {
 						$this->out('Your save worked after removing ' . $testField['key'] . ' with value ' . $testField['value'] );
-						exit;
+						return false;
 					} else {
 						$this->out('<error>Save failed without key ' . $alias .'.'. $testField['key'] . "</error>\n" . $message);
 					}
