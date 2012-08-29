@@ -822,6 +822,13 @@ class ElasticSource extends DataSource {
 				case 'boolean':
 					$filter = $this->term($key, $operator, $value);
 					break;
+				case 'nested':
+					if (isset($value['nested'])) {
+						$filter = array('nested' => array('path' => $key, 'query' => $value['nested']));
+					} else {
+						$filter = $this->term($key, $operator, $value);
+					}
+					break;
 				default:
 					throw new Exception("Unable to process field of type '$type' for key '$key'");
 			}
@@ -1283,10 +1290,11 @@ class ElasticSource extends DataSource {
 			}
 
 			$results = $this->_parseResponse($response);
+			$this->logQuery($method, $uri, $body, $results);
 			if (!is_string($body)) {
 				$body = json_encode($body);
 			}
-			$this->logQuery($method, $uri, $body, $results);
+
 			return $results;
 	}
 
@@ -1532,5 +1540,15 @@ class ElasticSource extends DataSource {
 			default:
 				throw new Exception("ElasticSearch Error: " . $info->error . ' Status: ' . $info->status);
 		}
+	}
+
+/**
+ * Make Elastic play nice with Model::escapeField();
+ *
+ * @param string $alias The model alias
+ * @return string
+ */
+	public function name($alias) {
+		return $alias;
 	}
 }
