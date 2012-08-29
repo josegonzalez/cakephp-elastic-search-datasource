@@ -686,6 +686,11 @@ class ElasticSource extends DataSource {
 				$direction = current($value);
 			}
 
+			if ($field === '_script') {
+				$results[] = $value;
+				continue;
+			}
+
 			$alias = $Model->alias;
 
 			if (strpos($field, '.')) {
