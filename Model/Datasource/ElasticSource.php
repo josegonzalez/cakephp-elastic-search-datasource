@@ -92,7 +92,7 @@ class ElasticSource extends DataSource {
  *
  * @var boolean
  */
-	protected $_listSources = false;
+	protected $_listSources = true;
 
 /**
  * Query log
@@ -686,7 +686,7 @@ class ElasticSource extends DataSource {
 				$direction = current($value);
 			}
 
-			if ($field === '_script') {
+			if (isset($field) && $field === '_script') {
 				$results[] = $value;
 				continue;
 			}
@@ -1281,6 +1281,8 @@ class ElasticSource extends DataSource {
 				$body = null;
 			}
 
+			//debug($uri);
+			//debug($body);
 			switch ($method) {
 				case 'get':
 					$response = call_user_func_array(array(&$this->Http, $method), array($uri, array(), compact('body')));
@@ -1551,4 +1553,42 @@ class ElasticSource extends DataSource {
 	public function name($alias) {
 		return $alias;
 	}
+
+/**
+ * Gets full table name including prefix
+ *
+ * @param Model|string $model Either a Model object or a string table name.
+ * @param boolean $quote Whether you want the table name quoted.
+ * @param boolean $schema Whether you want the schema name included.
+ * @return string Full quoted table name
+ */
+	public function fullTableName($model, $quote = true, $schema = true) {
+		if (is_object($model)) {
+			$schemaName = $model->schemaName;
+			$table = $model->tablePrefix . $model->table;
+		} elseif (!empty($this->config['prefix']) && strpos($model, $this->config['prefix']) !== 0) {
+			$table = $this->config['prefix'] . strval($model);
+		} else {
+			$table = strval($model);
+		}
+		if ($schema && !isset($schemaName)) {
+			$schemaName = $this->getSchemaName();
+		}
+
+		if ($quote) {
+			if ($schema && !empty($schemaName)) {
+				if (false == strstr($table, '.')) {
+					return $this->name($schemaName) . '.' . $this->name($table);
+				}
+			}
+			return $this->name($table);
+		}
+		if ($schema && !empty($schemaName)) {
+			if (false == strstr($table, '.')) {
+				return $schemaName . '.' . $table;
+			}
+		}
+		return $table;
+	}
 }
+
