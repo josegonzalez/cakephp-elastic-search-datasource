@@ -328,8 +328,12 @@ class ElasticSource extends DataSource {
 
 		foreach ($values as $value) {
 			$record = array($alias => array_combine($fields, $value));
-			$id = $record[$alias][$primaryKey];
-			$documents[$id] = $record;
+			if (isset($record[$alias][$primaryKey])) {
+				$id = $record[$alias][$primaryKey];
+				$documents[$id] = $record;
+			} else {
+				$documents[] = $record;
+			}
 		}
 
 		if (!empty($documents)) {
