@@ -249,12 +249,21 @@ class ElasticSource extends DataSource {
  */
 	public function delete(Model $Model, $conditions = null) {
 		if (!empty($conditions)) {
-			$record = $Model->find('first', $conditions);
+			$record = $Model->find('first', array('conditions' => $conditions));
 		} else {
 			$record = $Model->findById($Model->id);
 		}
 
+		if (empty($record)) {
+			return false;
+		}
+
+		if (empty($record[$Model->alias][$Model->primaryKey])) {
+			return false;
+		}
+
 		$id = $record[$Model->alias][$Model->primaryKey];
+
 		$type = $this->getType($Model);
 
 		return $this->_delete($type, $id);
