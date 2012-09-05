@@ -328,12 +328,11 @@ class ElasticSource extends DataSource {
 
 		foreach ($values as $value) {
 			$record = array($alias => array_combine($fields, $value));
+			$_id = null;
 			if (isset($record[$alias][$primaryKey])) {
-				$id = $record[$alias][$primaryKey];
-				$documents[$id] = $record;
-			} else {
-				$documents[] = $record;
+				$_id = $record[$alias][$primaryKey];
 			}
+			$documents[] = $record + compact('_id');
 		}
 
 		if (!empty($documents)) {
@@ -419,8 +418,10 @@ class ElasticSource extends DataSource {
 
 		$json = array();
 
-		foreach ($documents as $id => $document) {
-			$command = array('index' => array('_index' => $this->config['index'], '_type' => $type, '_id' => $id));
+		foreach ($documents as $document) {
+			$_id = isset($document['_id']) ? $document['_id'] : null;
+			unset($document['_id']);
+			$command = array('index' => array('_index' => $this->config['index'], '_type' => $type) + compact('_id'));
 			$json[] = json_encode($command);
 			$json[] = json_encode($document);
 		}
