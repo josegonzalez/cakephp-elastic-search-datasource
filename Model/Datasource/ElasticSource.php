@@ -639,7 +639,7 @@ class ElasticSource extends DataSource {
 			$new = $conf['key'];
 
 			if (empty($queryData[$old])) {
-				switch ($new['onEmpty']) {
+				switch ($conf['onEmpty']) {
 					case 'skip':
 						continue 2;
 					case 'array':
