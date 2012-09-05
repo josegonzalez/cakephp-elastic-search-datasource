@@ -225,7 +225,6 @@ class ElasticSource extends DataSource {
 		} else {
 			$api = $Model->findQueryType === 'count' ? '_count' : '_search';
 		}
-
 		$results = $this->get($this->getType($Model), $api, $query);
 
 
@@ -585,17 +584,37 @@ class ElasticSource extends DataSource {
 	public function generateQuery(Model $Model, $queryData = array()) {
 
 		$queryKeys = array(
-			'conditions' => 'filter',
-			'limit' => 'size',
-			'page' => 'from',
-			'query' => 'query',
-			'order' => 'sort',
-			'fields' => 'fields',
-			'facets' => 'facets'
+			'conditions' => array(
+				'key' => 'filter',
+				'onEmpty' => 'skip'
+			),
+			'limit' => array(
+				'key' => 'size',
+				'onEmpty' => 'skip'
+			),
+			'page' => array(
+				'key' => 'from',
+				'onEmpty' => 'skip'
+			),
+			'query' => array(
+				'key' => 'query',
+				'onEmpty' => 'array'
+			),
+			'order' => array(
+				'key' => 'sort',
+				'onEmpty' => 'skip'
+			),
+			'fields' => array(
+				'key' => 'fields',
+				'onEmpty' => 'skip'
+			),
+			'facets' => array(
+				'key' => 'facets',
+				'onEmpty' => 'skip'
+			)
 		);
 
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
-
 		$queryData['conditions'] = $this->afterParseConditions($Model, $queryData['conditions']);
 
 		if (is_string($queryData['conditions'])) {
@@ -616,8 +635,20 @@ class ElasticSource extends DataSource {
 			$queryData['page'] = $queryData['page'] * $queryData['limit'];
 		}
 
-		foreach ($queryKeys as $old => $new) {
-			$query[$new] = empty($queryData[$old]) ? null : $queryData[$old];
+		foreach ($queryKeys as $old => $conf) {
+			$new = $conf['key'];
+
+			if (empty($queryData[$old])) {
+				switch ($new['onEmpty']) {
+					case 'skip':
+						continue 2;
+					case 'array':
+						$queryData[$old] = array();
+						break;
+				}
+			} else {
+				$query[$new] = $queryData[$old];
+			}
 		}
 
 		$query['type'] = $this->parseQueryType($query);
@@ -632,8 +663,6 @@ class ElasticSource extends DataSource {
 
 
 		$query = compact('query', 'size', 'sort', 'from', 'fields', 'facets');
-
-		$query = Set::filter($query);
 
 		if ($Model->findQueryType === 'count') {
 			return $query['query'];
@@ -665,15 +694,11 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function parseConditions(Model $Model, $conditions = array()) {
-
 		$filters = array();
 		if (!empty($conditions)) {
 			foreach ($conditions as $key => $value) {
 				$data = $this->_parseKey($Model, trim($key), $value);
-				if (!empty($data)) {
-					$filters[] = $data;
-					$data = null;
-				}
+				$filters[] = $data;
 			}
 		}
 
@@ -1295,8 +1320,6 @@ class ElasticSource extends DataSource {
 				$body = null;
 			}
 
-			//debug($uri);
-			//debug($body);
 			switch ($method) {
 				case 'get':
 					$response = call_user_func_array(array(&$this->Http, $method), array($uri, array(), compact('body')));
