@@ -198,7 +198,7 @@ class ElasticSource extends DataSource {
 		$id = $this->_findKey($Model, $document);
 
 		if (!$id) {
-			throw new Exception('ElasticSource requires a primary key to index a document');
+			$id = null;
 		}
 
 		$results = $this->index($this->getType($Model), $id, $document);
@@ -299,7 +299,10 @@ class ElasticSource extends DataSource {
 		throw new Exception ('Cannot call method ' . $method . ' on ElasticSource');
 	}
 
-	public function index($type, $id, $document = array()) {
+	public function index($type, $id = null, $document = array()) {
+		if ($id === null) {
+			return $this->post($type, null, $document);
+		}
 		return $this->put($type, $id, $document);
 	}
 
