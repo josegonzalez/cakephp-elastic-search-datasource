@@ -67,6 +67,13 @@ class ElasticSource extends DataSource {
 	protected $_type = null;
 
 /**
+ * Holding data for _parent.
+ *
+ * @var string
+ */
+	protected $_parent = null;
+
+/**
  * If we are in a transaction this is the id for the model we are indexing
  *
  * @var string
@@ -189,6 +196,12 @@ class ElasticSource extends DataSource {
  */
 	public function create(Model $Model, $fields = array(), $values = array()) {
 
+		$parentIndex = array_search('_parent', $fields);
+		if ($parentIndex !== false) {
+			$this->_parent = $values[$parentIndex];
+			unset($values[$parentIndex], $fields[$parentIndex]);
+		}
+
 		$document = array($Model->alias => array_combine($fields, $values));
 
 		if ($this->inTransaction()) {
@@ -203,6 +216,7 @@ class ElasticSource extends DataSource {
 
 		$results = $this->index($this->getType($Model), $id, $document);
 
+		$this->_parent = null;
 		return $results;
 	}
 
@@ -334,7 +348,11 @@ class ElasticSource extends DataSource {
 			if (isset($record[$alias][$primaryKey])) {
 				$_id = $record[$alias][$primaryKey];
 			}
-			$documents[] = $record + compact('_id');
+			if (isset($record[$alias]['_parent'])) {
+				$_parent = $record[$alias]['_parent'];
+				unset($record[$alias]['_parent']);
+			}
+			$documents[] = $record + compact('_id', '_parent');
 		}
 
 		if (!empty($documents)) {
@@ -377,8 +395,12 @@ class ElasticSource extends DataSource {
 					unset($description['tableParameters']);
 				}
 
+				if (!empty($description['_parent'])) {
+					$_parent = $description['_parent'];
+					unset($description['_parent']);
+				}
 				$properties = $this->_parseDescription(array($alias => $description));
-				$mapping = array($type => compact('properties'));
+				$mapping = array($type => compact('properties', '_parent'));
 				$result = $this->put($type, '_mapping', $mapping);
 
 				if (!$result) {
@@ -422,8 +444,9 @@ class ElasticSource extends DataSource {
 
 		foreach ($documents as $document) {
 			$_id = isset($document['_id']) ? $document['_id'] : null;
-			unset($document['_id']);
-			$command = array('index' => array('_index' => $this->config['index'], '_type' => $type) + compact('_id'));
+			$_parent = isset($document['_parent']) ? $document['_parent'] : null;
+			unset($document['_id'], $document['_parent']);
+			$command = array('index' => array('_index' => $this->config['index'], '_type' => $type) + compact('_id', '_parent'));
 			$json[] = json_encode($command);
 			$json[] = json_encode($document);
 		}
@@ -526,6 +549,10 @@ class ElasticSource extends DataSource {
 	public function addToDocument(Model $Model, $document = array()) {
 		$this->_setupTransaction($Model, $document);
 		$this->_document[$this->_id] = Set::merge($this->_document[$this->_id], $document);
+		if ($this->_parent !== null) {
+			$this->_document[$this->_id]['_parent'] = $this->_parent;
+			$this->_parent = null;
+		}
 		return true;
 	}
 
@@ -728,7 +755,7 @@ class ElasticSource extends DataSource {
 				$direction = current($value);
 			}
 
-			if ($field === '_script') {
+			if (isset($field) && $field === '_script') {
 				$results[] = $value;
 				continue;
 			}
@@ -863,6 +890,13 @@ class ElasticSource extends DataSource {
 					break;
 				case 'boolean':
 					$filter = $this->term($key, $operator, $value);
+					break;
+				case 'nested':
+					if (isset($value['nested'])) {
+						$filter = array('nested' => array('path' => $key, 'query' => $value['nested']));
+					} else {
+						$filter = $this->term($key, $operator, $value);
+					}
 					break;
 				default:
 					throw new Exception("Unable to process field of type '$type' for key '$key'");
@@ -1310,6 +1344,13 @@ class ElasticSource extends DataSource {
 
 			//Could contain $body and $query
 			extract($data);
+
+			// Append "_parent" to query instead of data
+			if ($this->_parent !== null) {
+				$query['parent'] = $this->_parent;
+				$this->_parent = null;
+			}
+
 			$uri = $this->_uri(compact('path', 'query'));
 
 			if (!isset($body)) {
@@ -1573,5 +1614,52 @@ class ElasticSource extends DataSource {
 			default:
 				throw new Exception("ElasticSearch Error: " . $info->error . ' Status: ' . $info->status);
 		}
+	}
+
+/**
+ * Make Elastic play nice with Model::escapeField();
+ *
+ * @param string $alias The model alias
+ * @return string
+ */
+	public function name($alias) {
+		return $alias;
+	}
+
+/**
+ * Gets full table name including prefix
+ *
+ * @param Model|string $model Either a Model object or a string table name.
+ * @param boolean $quote Whether you want the table name quoted.
+ * @param boolean $schema Whether you want the schema name included.
+ * @return string Full quoted table name
+ */
+	public function fullTableName($model, $quote = true, $schema = true) {
+		if (is_object($model)) {
+			$schemaName = $model->schemaName;
+			$table = $model->tablePrefix . $model->table;
+		} elseif (!empty($this->config['prefix']) && strpos($model, $this->config['prefix']) !== 0) {
+			$table = $this->config['prefix'] . strval($model);
+		} else {
+			$table = strval($model);
+		}
+		if ($schema && !isset($schemaName)) {
+			$schemaName = $this->getSchemaName();
+		}
+
+		if ($quote) {
+			if ($schema && !empty($schemaName)) {
+				if (false == strstr($table, '.')) {
+					return $this->name($schemaName) . '.' . $this->name($table);
+				}
+			}
+			return $this->name($table);
+		}
+		if ($schema && !empty($schemaName)) {
+			if (false == strstr($table, '.')) {
+				return $schemaName . '.' . $table;
+			}
+		}
+		return $table;
 	}
 }
