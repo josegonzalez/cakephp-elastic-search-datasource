@@ -1413,8 +1413,7 @@ class ElasticSource extends DataSource {
 				if (!empty($result['fields'])) {
 					foreach ($result['fields'] as $field => $value) {
 						if (strpos($field, '.') && strpos($field, 'doc') !== 0) {
-							list($alias, $field) = explode('.', $field);
-							$tmp[$alias][$field] = $value;
+							$tmp = Hash::insert($tmp, $field, $value);
 						} else {
 							$tmp[0][$field] = $value;
 						}
