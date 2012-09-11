@@ -635,7 +635,7 @@ class ElasticSource extends DataSource {
 		if($queryData['page'] === 1) {
 			$queryData['page'] = 0;
 		} else {
-			$queryData['page'] = $queryData['page'] * $queryData['limit'];
+			$queryData['page'] = ($queryData['page'] - 1 ) * $queryData['limit'];
 		}
 
 		foreach ($queryKeys as $old => $conf) {
