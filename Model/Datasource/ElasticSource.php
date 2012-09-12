@@ -67,6 +67,13 @@ class ElasticSource extends DataSource {
 	protected $_type = null;
 
 /**
+ * Holding data for _parent.
+ *
+ * @var string
+ */
+	protected $_parent = null;
+
+/**
  * If we are in a transaction this is the id for the model we are indexing
  *
  * @var string
@@ -189,6 +196,12 @@ class ElasticSource extends DataSource {
  */
 	public function create(Model $Model, $fields = array(), $values = array()) {
 
+		$parentIndex = array_search('_parent', $fields);
+		if ($parentIndex !== false) {
+			$this->_parent = $values[$parentIndex];
+			unset($values[$parentIndex], $fields[$parentIndex]);
+		}
+
 		$document = array($Model->alias => array_combine($fields, $values));
 
 		if ($this->inTransaction()) {
@@ -203,6 +216,7 @@ class ElasticSource extends DataSource {
 
 		$results = $this->index($this->getType($Model), $id, $document);
 
+		$this->_parent = null;
 		return $results;
 	}
 
@@ -334,7 +348,11 @@ class ElasticSource extends DataSource {
 			if (isset($record[$alias][$primaryKey])) {
 				$_id = $record[$alias][$primaryKey];
 			}
-			$documents[] = $record + compact('_id');
+			if (isset($record[$alias]['_parent'])) {
+				$_parent = $record[$alias]['_parent'];
+				unset($record[$alias]['_parent']);
+			}
+			$documents[] = $record + compact('_id', '_parent');
 		}
 
 		if (!empty($documents)) {
@@ -377,8 +395,12 @@ class ElasticSource extends DataSource {
 					unset($description['tableParameters']);
 				}
 
+				if (!empty($description['_parent'])) {
+					$_parent = $description['_parent'];
+					unset($description['_parent']);
+				}
 				$properties = $this->_parseDescription(array($alias => $description));
-				$mapping = array($type => compact('properties'));
+				$mapping = array($type => compact('properties', '_parent'));
 				$result = $this->put($type, '_mapping', $mapping);
 
 				if (!$result) {
@@ -422,8 +444,9 @@ class ElasticSource extends DataSource {
 
 		foreach ($documents as $document) {
 			$_id = isset($document['_id']) ? $document['_id'] : null;
-			unset($document['_id']);
-			$command = array('index' => array('_index' => $this->config['index'], '_type' => $type) + compact('_id'));
+			$_parent = isset($document['_parent']) ? $document['_parent'] : null;
+			unset($document['_id'], $document['_parent']);
+			$command = array('index' => array('_index' => $this->config['index'], '_type' => $type) + compact('_id', '_parent'));
 			$json[] = json_encode($command);
 			$json[] = json_encode($document);
 		}
@@ -526,6 +549,10 @@ class ElasticSource extends DataSource {
 	public function addToDocument(Model $Model, $document = array()) {
 		$this->_setupTransaction($Model, $document);
 		$this->_document[$this->_id] = Set::merge($this->_document[$this->_id], $document);
+		if ($this->_parent !== null) {
+			$this->_document[$this->_id]['_parent'] = $this->_parent;
+			$this->_parent = null;
+		}
 		return true;
 	}
 
@@ -833,6 +860,17 @@ class ElasticSource extends DataSource {
 			return array('query' => array('query_string' => $value));
 		}
 
+		if ($key === 'has_child') {
+			$type = ClassRegistry::init($value['model']);
+			unset($value['model']);
+			$result = $this->parseConditions($type, $value);
+			return array(
+				'has_child' => array(
+					'type' => $this->getType($type), 'query' => $result
+				)
+			);
+		}
+
 		$booleanCheck = explode(' ', trim($key), 2);
 		$operator = trim($operator);
 		$booleanOperator = $operator;
@@ -1084,7 +1122,12 @@ class ElasticSource extends DataSource {
  * @return string Column type
  */
 	public function getColumnType($model, $column) {
-		$cols = $model->schema();
+		if (method_exists($model, 'elasticMapping')) {
+			$cols = $model->elasticMapping();
+		} else {
+			$cols = $model->schema();
+		}
+
 		$parts = explode('.', $column);
 		if (current($parts) === $model->alias) {
 			array_shift($parts);
@@ -1187,11 +1230,16 @@ class ElasticSource extends DataSource {
 
 		$type = $this->getType($Model);
 
+		if (!empty($description[$alias]['_parent'])) {
+			$_parent = $description[$alias]['_parent'];
+			unset($description[$alias]['_parent']);
+		}
+
 		$mapping = array($Model->alias => $description);
 
 		$properties = $this->_parseDescription($description, $Model);
 
-		$mapping = array($type => compact('properties'));
+		$mapping = array($type => compact('properties', '_parent'));
 
 		$result = $this->put($type, '_mapping', $mapping);
 
@@ -1317,6 +1365,13 @@ class ElasticSource extends DataSource {
 
 			//Could contain $body and $query
 			extract($data);
+
+			// Append "_parent" to query instead of data
+			if ($this->_parent !== null) {
+				$query['parent'] = $this->_parent;
+				$this->_parent = null;
+			}
+
 			$uri = $this->_uri(compact('path', 'query'));
 
 			if (!isset($body)) {
