@@ -860,6 +860,17 @@ class ElasticSource extends DataSource {
 			return array('query' => array('query_string' => $value));
 		}
 
+		if ($key === 'has_child') {
+			$type = ClassRegistry::init($value['model']);
+			unset($value['model']);
+			$result = $this->parseConditions($type, $value);
+			return array(
+				'has_child' => array(
+					'type' => $this->getType($type), 'query' => $result
+				)
+			);
+		}
+
 		$booleanCheck = explode(' ', trim($key), 2);
 		$operator = trim($operator);
 		$booleanOperator = $operator;
@@ -1111,7 +1122,12 @@ class ElasticSource extends DataSource {
  * @return string Column type
  */
 	public function getColumnType($model, $column) {
-		$cols = $model->schema();
+		if (method_exists($model, 'elasticMapping')) {
+			$cols = $model->elasticMapping();
+		} else {
+			$cols = $model->schema();
+		}
+
 		$parts = explode('.', $column);
 		if (current($parts) === $model->alias) {
 			array_shift($parts);
@@ -1214,11 +1230,16 @@ class ElasticSource extends DataSource {
 
 		$type = $this->getType($Model);
 
+		if (!empty($description[$alias]['_parent'])) {
+			$_parent = $description[$alias]['_parent'];
+			unset($description[$alias]['_parent']);
+		}
+
 		$mapping = array($Model->alias => $description);
 
 		$properties = $this->_parseDescription($description, $Model);
 
-		$mapping = array($type => compact('properties'));
+		$mapping = array($type => compact('properties', '_parent'));
 
 		$result = $this->put($type, '_mapping', $mapping);
 
