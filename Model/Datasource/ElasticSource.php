@@ -871,6 +871,11 @@ class ElasticSource extends DataSource {
 			);
 		}
 
+		if (in_array($key, array('exists', 'missing'))) {
+			$value = is_string($value) ? array('field' => $value) : $value;
+			return array($key => $value);
+		}
+
 		$booleanCheck = explode(' ', trim($key), 2);
 		$operator = trim($operator);
 		$booleanOperator = $operator;
