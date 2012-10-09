@@ -126,8 +126,10 @@ class ElasticSource extends DataSource {
 		}
 		$scheme = 'http';
 		$request = array('uri' => compact('host', 'port', 'scheme'));
-		$httpConfig = compact('host', 'port', 'request');
-		$this->Http = new HttpSocket($httpConfig);
+		$httpConfig = compact('host', 'port', 'request', 'extra');
+
+		$className = isset($config['adapter']) ? $config['adapter'] : 'HttpSocket';
+		$this->Http = new $className($httpConfig);
 		$this->startQuote = $this->endQuote = null;
 	}
 
@@ -1434,12 +1436,11 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _parseResponse($response) {
-
 		if (empty($response->body)) {
 			throw new Exception('Missing response');
 		}
 
-		$body = json_decode($response['body']);
+		$body = json_decode($response->body);
 
 		if (!empty($body->items)) {
 			foreach ($body->items as $item) {
