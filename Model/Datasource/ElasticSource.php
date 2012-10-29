@@ -261,25 +261,17 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function delete(Model $Model, $conditions = null) {
-		if (!empty($conditions)) {
-			$record = $Model->find('first', array('conditions' => $conditions));
-		} else {
-			$record = $Model->findById($Model->id);
-		}
-
-		if (empty($record)) {
-			return false;
-		}
-
-		if (empty($record[$Model->alias][$Model->primaryKey])) {
-			return false;
-		}
-
-		$id = $record[$Model->alias][$Model->primaryKey];
-
 		$type = $this->getType($Model);
 
-		return $this->_delete($type, $id);
+		if ($conditions === array($Model->alias . '.' . $Model->primaryKey => $Model->id)) {
+			return $this->_delete($type, $Model->id);
+		}
+
+		$query = $this->generateQuery($Model, compact('conditions') + array(
+			'order' => array(),
+			'page' => 1
+		));
+		return $this->execute('delete', $type, '_query', array('body' => json_encode($query['query'])));
 	}
 
 /**
@@ -668,7 +660,7 @@ class ElasticSource extends DataSource {
 
 		$query = array();
 
-		if (empty($queryData['limit'])) {
+		if (isset($queryData['limit']) && empty($queryData['limit'])) {
 			$queryData['limit'] = 10;
 		}
 
