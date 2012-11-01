@@ -1157,7 +1157,7 @@ class ElasticSource extends DataSource {
 		return $pointer['type'];
 	}
 
-	public function createIndex($index, $alias = false) {
+	public function createIndex($index, $alias = false, $settings = array()) {
 		$type = 'put';
 		$api = $index;
 		$body = null;
@@ -1170,8 +1170,9 @@ class ElasticSource extends DataSource {
 			$api = '_aliases';
 			$actions = array();
 			$actions[] = array('add' => compact('index', 'alias'));
-			$body = compact('actions');
 		}
+
+		$body = compact('actions', 'settings');
 
 		try {
 			$return = $this->{$type}(null, $api, $body);
