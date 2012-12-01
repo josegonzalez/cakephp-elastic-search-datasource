@@ -1444,6 +1444,10 @@ class ElasticSource extends DataSource {
 			return $this->_throwError($body);
 		}
 
+		if (isset($body->exists) && $body->exists === false) {
+			return false;
+		}
+
 		if (!empty($body->ok) && $body->ok == true) {
 			return true;
 		}
