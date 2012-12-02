@@ -36,6 +36,11 @@ class TestModeTest extends CakeTestCase {
  	// 	$this->assertEquals('test_index', $this->Model->useDbConfig);
  	// }
 
+	public function testNonExistentRecord() {
+		$result = $this->Model->findById('non_existent_id');
+		$this->assertEqual($result, false);
+	}
+
 	public function testRead() {
 		$expected = array(
 			'TestModel' => array(
