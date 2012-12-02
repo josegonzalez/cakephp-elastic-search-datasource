@@ -140,7 +140,7 @@ class ElasticSource extends DataSource {
  * @return array Schema
  * @author David Kullmann
  */
-	public function describe(Model $Model) {
+	public function describe($Model) {
 		if (empty($this->_schema)) {
 			$mapping = $this->getMapping();
 			$this->_schema = $this->parseMapping($mapping);
@@ -167,7 +167,7 @@ class ElasticSource extends DataSource {
  * @return array Array of types - similar to tables in a DB
  * @author David Kullmann
  */
-	public function listSources() {
+	public function listSources($data = null) {
 		$sources = array();
 
 		if ($this->_listSources) {
