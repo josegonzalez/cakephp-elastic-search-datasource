@@ -14,7 +14,7 @@ class AllTest extends PHPUnit_Framework_TestSuite {
  */
 	public static function suite() {
 
-		$suite = new PHPUnit_Framework_TestSuite('All Recon App related class tests');
+		$suite = new CakeTestSuite('All Elastic Search related class tests');
 		
 		$pluginTestPath = array('Plugin', 'Elastic', 'Test', 'Case');
 
@@ -23,6 +23,9 @@ class AllTest extends PHPUnit_Framework_TestSuite {
 
 		/* Behaviors */
 		$suite->addTestFile(APP . implode(DS, array_merge($pluginTestPath, array('Model', 'Behavior', 'IndexableBehaviorTest.php'))));
+
+		/* Model */
+		$suite->addTestDirectory(APP . implode(DS, array_merge($pluginTestPath, array('Model'))));
 		
 		return $suite;
 	}

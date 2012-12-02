@@ -43,25 +43,18 @@ class TestModeTest extends CakeTestCase {
 
 	public function testRead() {
 		$expected = array(
-			'TestModel' => array(
-				'id'       => 'test-model',
-				'string'   => 'Analyzed for terms',
-				'created'  => '2012-01-01 00:00:00',
-				'modified' => '2012-02-01 00:00:00'
-			)
+			array(
+				'TestModel' => array(
+					'id'       => 'test-model',
+					'string'   => 'Analyzed for terms',
+					'created'  => '2012-01-01 00:00:00',
+					'modified' => '2012-02-01 00:00:00'
+				),
+			),
 		);
 		
 		$result = $this->Model->find('all');
-		
-		$log = ConnectionManager::getDataSource('test_index')->getLog();
-		
-		foreach ($log['log'] as $query) {
-			echo $query['query'] . "\n\n";
-		}
-
-		debug($result);exit;
-		
-		$this->assertEquals($expected, $result);
+		$this->assertEquals($result, $expected);
 	}
 
 }
