@@ -469,7 +469,9 @@ class ElasticSource extends DataSource {
 		}
 		
 		foreach ($queryKeys as $old => $new) {
-			$query[$new] = empty($queryData[$old]) ? null : $queryData[$old];
+			if(!empty($queryData[$old])){
+				$query[$new] = $queryData[$old];
+			}
 		}
 		
 		$query['type'] = $this->parseQueryType($query);
@@ -484,13 +486,13 @@ class ElasticSource extends DataSource {
 
 
 		$query = compact('query', 'size', 'sort', 'from', 'fields', 'facets');
-				
-		$query = Set::filter($query);
+
+		//$query = Set::filter($query);
 
 		if ($Model->findQueryType === 'count') {
 			return $query['query'];
 		}
-
+		//debug(json_encode($query));exit;
 		return $query;
 	}
 	
@@ -595,7 +597,6 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _parseKey(Model $Model, $key, $value) {
-
 		if (is_numeric($key)) {
 			if (empty($value)) {
 				return false;
@@ -635,9 +636,7 @@ class ElasticSource extends DataSource {
 			}
 			return array(strtolower($key) => $result);
 		}
-
 		$type = $Model->getColumnType($key);
-
 		if ($value === null) {
 			$filter = $this->missing($key, $value);
 		} else {
