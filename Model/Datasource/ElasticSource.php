@@ -979,9 +979,8 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _parseResponse($response) {
-
 		if (empty($response->body)) {
-			throw new Exception('Missing response');
+			throw new Exception(sprintf("Missing response:\n%s", print_r($response, true)));
 		}
 		
 		$body = json_decode($response['body']);
