@@ -1172,6 +1172,10 @@ class ElasticSource extends DataSource {
 			$actions[] = array('add' => compact('index', 'alias'));
 		}
 
+		if (empty($settings)) {
+			unset($settings);
+		}
+
 		$body = compact('actions', 'settings');
 
 		try {
