@@ -965,7 +965,7 @@ class ElasticSource extends DataSource {
 		} elseif (!empty($filters[0])) {
 			$filters = $filters[0];
 			if (!empty($filters['term']['id']) && count($filters['term']['id']) === 1) {
-				return $filters['term']['id'][0];
+				$filters['term']['id'] = $filters['term']['id'][0];
 			}
 		}
 		return $filters;
