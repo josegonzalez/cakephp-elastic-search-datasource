@@ -140,25 +140,25 @@ class ElasticSource extends DataSource {
  * @return array Schema
  * @author David Kullmann
  */
-	public function describe(Model $Model) {
+	public function describe($model) {
 		if (empty($this->_schema)) {
 			$mapping = $this->getMapping();
 			$this->_schema = $this->parseMapping($mapping);
 		}
 
-		if (empty($this->_schema[$Model->alias][$Model->primaryKey])) {
-			$this->_schema[$Model->alias][$Model->primaryKey] = array('type' => 'string', 'length' => 255);
-		} elseif (!empty($this->_schema[$Model->alias][$Model->primaryKey]['type'])) {
-			if (empty($this->_schema[$Model->alias][$Model->primaryKey]['length'])) {
-				if ($this->_schema[$Model->alias][$Model->primaryKey]['type'] === 'string') {
-					$this->_schema[$Model->alias][$Model->primaryKey]['length'] = 255;
-				} elseif ($this->_schema[$Model->alias][$Model->primaryKey]['type'] === 'integer') {
-					$this->_schema[$Model->alias][$Model->primaryKey]['length'] = 11;
+		if (empty($this->_schema[$model->alias][$model->primaryKey])) {
+			$this->_schema[$model->alias][$model->primaryKey] = array('type' => 'string', 'length' => 255);
+		} elseif (!empty($this->_schema[$model->alias][$model->primaryKey]['type'])) {
+			if (empty($this->_schema[$model->alias][$model->primaryKey]['length'])) {
+				if ($this->_schema[$model->alias][$model->primaryKey]['type'] === 'string') {
+					$this->_schema[$model->alias][$model->primaryKey]['length'] = 255;
+				} elseif ($this->_schema[$model->alias][$model->primaryKey]['type'] === 'integer') {
+					$this->_schema[$model->alias][$model->primaryKey]['length'] = 11;
 				}
 			}
 		}
 
-		return $this->_schema[$Model->alias];
+		return $this->_schema[$model->alias];
 	}
 
 /**
@@ -167,7 +167,7 @@ class ElasticSource extends DataSource {
  * @return array Array of types - similar to tables in a DB
  * @author David Kullmann
  */
-	public function listSources() {
+	public function listSources($data = NULL) {
 		$sources = array();
 
 		if ($this->_listSources) {
@@ -230,7 +230,7 @@ class ElasticSource extends DataSource {
  * @return mixed boolean false on failure or array of records on success
  * @author David Kullmann
  */
-	public function read(Model $Model, $queryData = array()) {
+	public function read(Model $Model, $queryData = array(), $recursive = NULL) {
 		$this->currentModel($Model);
 
 		$query = $this->generateQuery($Model, $queryData);
@@ -250,7 +250,7 @@ class ElasticSource extends DataSource {
 		return $results;
 	}
 
-	public function update(Model $Model, $fields = array(), $values = array()) {
+	public function update(Model $Model, $fields = array(), $values = array(), $conditions = NULL) {
 		return $this->create($Model, $fields, $values);
 	}
 
