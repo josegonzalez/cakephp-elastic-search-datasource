@@ -1174,6 +1174,10 @@ class ElasticSource extends DataSource {
 
 		$body = compact('actions', 'settings');
 
+		if (empty($body['settings'])) {
+			unset($body['settings']);
+		}
+
 		try {
 			$return = $this->{$type}(null, $api, $body);
 		} catch (Exception $e) {
