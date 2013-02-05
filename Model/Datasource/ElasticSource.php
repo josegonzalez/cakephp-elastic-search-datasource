@@ -2,7 +2,7 @@
 
 App::uses('HttpSocket', 'Network/Http');
 App::uses('ElasticScroll', 'ElasticSearch.Model/Datasource/Cursor');
-
+include 'exceptions.php';
 
 /**
  * Throw this when we are missing an index
@@ -1185,7 +1185,7 @@ class ElasticSource extends DataSource {
 
 			$message = $e->getMessage();
 			if (preg_match('/IndexAlreadyExistsException/', $message)) {
-				throw new Exception("ElasticSearch index '$index' already exists");
+				throw new ElasticIndexExistException("ElasticSearch index '$index' already exists");
 			} else {
 				throw $e;
 			}
