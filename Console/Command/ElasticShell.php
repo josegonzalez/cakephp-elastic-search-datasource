@@ -391,4 +391,8 @@ class ElasticShell extends AppShell {
 		$this->out('<success>Data was reindex</success>');
 	}
 
+	public function _welcome() {
+
+	}
+
 }
