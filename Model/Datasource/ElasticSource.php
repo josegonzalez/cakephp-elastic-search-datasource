@@ -1422,6 +1422,7 @@ class ElasticSource extends DataSource {
 	protected function _uri($config) {
 		$config = Set::merge($this->Http->config, $config);
 		unset($config['request']);
+		unset($config['context']);
 		return $config;
 	}
 
