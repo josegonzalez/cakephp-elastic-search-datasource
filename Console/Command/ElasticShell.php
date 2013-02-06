@@ -1,5 +1,7 @@
 <?php
+
 App::uses('ConnectionManager', 'Model');
+App::uses('ClassRegistry', 'Utility');
 
 class ElasticShell extends AppShell {
 
