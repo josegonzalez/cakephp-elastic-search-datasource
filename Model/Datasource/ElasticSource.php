@@ -969,10 +969,11 @@ class ElasticSource extends DataSource {
 			$fields = array('id', $Model->escapeField());
 			foreach ($fields as $field) {
 				if (!empty($filters['term'][$field]) && count($filters['term'][$field]) === 1) {
-					return $filters['term'][$field];
+					return $filters['term'][$field][0];
 				}
 			}
 		}
+
 		return $filters;
 	}
 
@@ -1175,6 +1176,10 @@ class ElasticSource extends DataSource {
 			$api = '_aliases';
 			$actions = array();
 			$actions[] = array('add' => compact('index', 'alias'));
+		}
+
+		if (empty($settings)) {
+			unset($settings);
 		}
 
 		$body = compact('actions', 'settings');
@@ -1427,6 +1432,7 @@ class ElasticSource extends DataSource {
 	protected function _uri($config) {
 		$config = Set::merge($this->Http->config, $config);
 		unset($config['request']);
+		unset($config['context']);
 		return $config;
 	}
 
