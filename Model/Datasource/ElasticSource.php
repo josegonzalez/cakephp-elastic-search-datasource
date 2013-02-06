@@ -205,7 +205,6 @@ class ElasticSource extends DataSource {
 		}
 
 		$document = array($Model->alias => array_combine($fields, $values));
-
 		if ($this->inTransaction()) {
 			return $this->addToDocument($Model, $document);
 		}
@@ -233,20 +232,23 @@ class ElasticSource extends DataSource {
 	public function read(Model $Model, $queryData = array(), $recursive = NULL) {
 		$this->currentModel($Model);
 
-		$query = $this->generateQuery($Model, $queryData);
+		$type = isset($queryData['_type']) ? $queryData['_type'] : $Model->findQueryType;
+		$Model->findQueryType = $type;
 
+		$query = $this->generateQuery($Model, $queryData);
 		if (is_string($query)) {
 			$api = $query;
 			$query = null;
 		} else {
-			$api = $Model->findQueryType === 'count' ? '_count' : '_search';
+			$api = $type === 'count' ? '_count' : '_search';
 		}
+
 		$results = $this->get($this->getType($Model), $api, $query);
 
-
-		if($Model->findQueryType === 'count') {
+		if($type === 'count') {
 			return array(array($Model->alias => array('count' => $results)));
 		}
+
 		return $results;
 	}
 
@@ -818,7 +820,6 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _parseKey(Model $Model, $key, $value) {
-
 		if (is_numeric($key)) {
 			if (empty($value)) {
 				return false;
@@ -906,7 +907,7 @@ class ElasticSource extends DataSource {
 					break;
 				case 'multi_field':
 				case 'string':
-					$filter = $this->term($key, $operator, $value);
+					 $filter = $this->term($key, $operator, $value);
 					 break;
 				case 'geo_point':
 					$filter = $this->geo($key, $operator, $value);
@@ -964,8 +965,12 @@ class ElasticSource extends DataSource {
 			$filters = array('and' => $filters);
 		} elseif (!empty($filters[0])) {
 			$filters = $filters[0];
-			if (!empty($filters['term']['id']) && count($filters['term']['id']) === 1) {
-				return $filters['term']['id'][0];
+
+			$fields = array('id', $Model->escapeField());
+			foreach ($fields as $field) {
+				if (!empty($filters['term'][$field]) && count($filters['term'][$field]) === 1) {
+					return $filters['term'][$field];
+				}
 			}
 		}
 		return $filters;
@@ -1498,6 +1503,7 @@ class ElasticSource extends DataSource {
 			}
 			return $results['hits']['hits'];
 		}
+
 		if (!empty($results['_id'])) {
 			$model = $results['_source'];
 			if (empty($model[$this->currentModel->alias][$this->currentModel->primaryKey])) {
