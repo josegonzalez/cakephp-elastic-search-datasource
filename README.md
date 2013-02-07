@@ -274,7 +274,7 @@ conditions that should be met strictly and others that are just hints or
 				array('Model.tags must' => 'elastic'),
 				array('Model.tags must' => 'source'),
 
-				'Model.readers most_not <' => 100,
+				'Model.readers must_not <' => 100,
 			)
 		)
 	));
