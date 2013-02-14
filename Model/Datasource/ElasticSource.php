@@ -211,7 +211,6 @@ class ElasticSource extends DataSource {
 		} else {
 			$api = $Model->findQueryType === 'count' ? '_count' : '_search';
 		}
-
 		$results = $this->get($this->getType($Model), $api, $query);
 
 
@@ -249,7 +248,11 @@ class ElasticSource extends DataSource {
 	public function query($method, $params, Model $Model) {
 		if (preg_match('/find(All)?By(.+)/', $method, $matches)) {
 			$type = $matches[1] === 'All' ? 'all' : 'first';
-			$conditions = array( strtolower($matches[2]) => $params );
+			$conditions = array( strtolower($matches[2]) => $params[0] );
+			if(isset($params[1])){
+				$fields = $params[1];
+				return $Model->find($type, compact('conditions', 'fields'));
+			}
 			return $Model->find($type, compact('conditions'));
 			
 		}
@@ -451,7 +454,12 @@ class ElasticSource extends DataSource {
 		$queryData['conditions'] = $this->afterParseConditions($Model, $queryData['conditions']);
 
 		if (is_string($queryData['conditions'])) {
-			return $queryData['conditions'];
+			$query = $queryData['conditions'];
+			if(!empty($queryData['fields'])){
+				$fields = implode(',', $queryData['fields']);
+				$query = $query . '?fields=' . $fields;
+			}
+			return $query;
 		}
 		
 		$queryData['order'] = $this->parseOrder($Model, $queryData);
