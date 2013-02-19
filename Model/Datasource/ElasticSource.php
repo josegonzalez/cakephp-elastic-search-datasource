@@ -450,7 +450,7 @@ class ElasticSource extends DataSource {
 		);
 		
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
-		
+
 		$queryData['conditions'] = $this->afterParseConditions($Model, $queryData['conditions']);
 
 		if (is_string($queryData['conditions'])) {
@@ -691,8 +691,12 @@ class ElasticSource extends DataSource {
 			$filters = array('and' => $filters);
 		} elseif (!empty($filters[0])) {
 			$filters = $filters[0];
-			if (!empty($filters['term']['id']) && count($filters['term']['id']) === 1) {
-				return $filters['term']['id'][0];
+			if (!empty($filters['term']['id'])){
+				if(is_array($filters['term']['id'])) {
+					return $filters['term']['id'][0];
+				} else {
+					return $filters['term']['id'];
+				}
 			}
 		}
 		return $filters;
