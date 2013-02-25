@@ -1,5 +1,7 @@
 <?php
+
 App::uses('ConnectionManager', 'Model');
+App::uses('ClassRegistry', 'Utility');
 
 class ElasticShell extends AppShell {
 
@@ -389,6 +391,10 @@ class ElasticShell extends AppShell {
 		$cursor = $this->Model->scan(200, '5m');
 		$ds->reindex($cursor, array('toIndex' => $this->args[0], 'toType' => $ds->getType($this->Model)));
 		$this->out('<success>Data was reindex</success>');
+	}
+
+	public function _welcome() {
+
 	}
 
 }
