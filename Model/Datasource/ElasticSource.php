@@ -716,8 +716,6 @@ class ElasticSource extends DataSource {
 		if (empty($query['filter'])) {
 			if (empty($query['query'])) {
 				$type = 'query';
-			} else {
-				$type = 'query_string';
 			}
 		}
 		return $type;
