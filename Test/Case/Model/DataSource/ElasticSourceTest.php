@@ -284,6 +284,48 @@ class ElasticSourceTest extends CakeTestCase {
 		$this->assertEquals($expected, $result);
 		
 	}
+
+/**
+ * Test parse order
+ *
+ * @return void
+ * @author Tigran Gabrielyan
+ */
+	public function testParseOrder() {
+		$order = 'field_1';
+		$query = array('order' => array($order));
+		$result = $this->Es->parseOrder($this->Model, $query);
+		$expected = array(
+			array(
+				'ElasticSourceTestModel.field_1' => array(
+					'order' => 'asc'
+				),
+			),
+		);
+		$this->assertEqual($result, $expected);
+
+		$order = array('field_1', 'field_2' => 'desc', 'field_3' => 'asc');
+		$query = array('order' => array($order));
+		$result = $this->Es->parseOrder($this->Model, $query);
+		$expected = array(
+			array(
+				'ElasticSourceTestModel.field_1' => array(
+					'order' => 'asc'
+				),
+			),
+			array(
+				'ElasticSourceTestModel.field_2' => array(
+					'order' => 'desc'
+				),
+			),
+			array(
+				'ElasticSourceTestModel.field_3' => array(
+					'order' => 'asc'
+				),
+			),
+		);
+		$this->assertEqual($result, $expected);
+	}
 	
 }
 ?>

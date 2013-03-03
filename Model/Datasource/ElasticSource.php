@@ -539,40 +539,37 @@ class ElasticSource extends DataSource {
 
 		return $filters;
 	}
-	
+
 	public function parseOrder(Model $Model, $query = array()) {
-		
 		$results = array();
-		
-		$order = $query['order'];
-		
-		foreach ($order as $key => $value) {
-			
-			if ($key === 0 && empty($value)) {
+		$order = current($query['order']);
+		foreach ((array)$order as $key => $value) {
+			if (is_numeric($key) && empty($value)) {
 				return false;
 			}
-			
+
 			$direction = 'asc';
-			
-			if (is_string($value)) {
-			} elseif (is_array($value)) {
-				$field = key($value);
-				$direction = current($value);
+
+			if (is_numeric($key)) {
+				$field = $value;
+			} else {
+				$field = $key;
+				$direction = $value;
 			}
-			
+
 			if (strpos($field, '.')) {
 				list($alias, $field) = explode('.', $field);
 			} else {
 				$alias = $Model->alias;
 			}
-			
+
 			if ($alias !== $Model->alias) {
 				$aliasModel = ClassRegistry::init($alias);
 				$type = $aliasModel->getColumnType($field);
 			} else {
 				$type = $Model->getColumnType($field);
 			}
-			
+
 			switch ($type) {
 				case 'geo_point':
 					$results[] = array(
@@ -590,7 +587,7 @@ class ElasticSource extends DataSource {
 					$results[] = array($alias.'.'.$field => array('order' => strtolower($direction)));
 			}
 		}
-		
+
 		return $results;
 	}
 
