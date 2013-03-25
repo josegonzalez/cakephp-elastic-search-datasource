@@ -939,7 +939,7 @@ class ElasticSource extends DataSource {
 				$body = null;
 			}
 
-			$path = array_filter(array($this->config['index'], $type, $api));
+			$path = array_filter(array($this->config['index'], $type, urlencode($api)));
 
 			$path = '/' . implode('/', $path);
 			
