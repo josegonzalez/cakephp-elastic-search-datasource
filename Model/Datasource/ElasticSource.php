@@ -448,7 +448,6 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function bulkIndex($type = null, $documents = array()) {
-
 		$json = array();
 
 		foreach ($documents as $document) {
@@ -461,7 +460,6 @@ class ElasticSource extends DataSource {
 		}
 
 		$json = implode("\n", $json) . "\n";
-
 		return $this->post($type, '_bulk', $json, false);
 	}
 
@@ -514,9 +512,15 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function commit() {
-		$documents = $this->allDocuments();
+		if (!$this->inTransaction()) {
+			return true;
+		}
 
-		$results = $this->bulkIndex($this->_type, $documents);
+		$documents = $this->allDocuments();
+		$results = true;
+		if (!empty($documents)) {
+			$results = $this->bulkIndex($this->_type, $documents);
+		}
 
 		$this->reset();
 		return $results;
