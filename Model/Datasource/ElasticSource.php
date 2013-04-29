@@ -2,7 +2,7 @@
 
 App::uses('HttpSocket', 'Network/Http');
 App::uses('ElasticScroll', 'ElasticSearch.Model/Datasource/Cursor');
-
+include 'exceptions.php';
 
 /**
  * Throw this when we are missing an index
@@ -140,25 +140,25 @@ class ElasticSource extends DataSource {
  * @return array Schema
  * @author David Kullmann
  */
-	public function describe(Model $Model) {
+	public function describe($model) {
 		if (empty($this->_schema)) {
 			$mapping = $this->getMapping();
 			$this->_schema = $this->parseMapping($mapping);
 		}
 
-		if (empty($this->_schema[$Model->alias][$Model->primaryKey])) {
-			$this->_schema[$Model->alias][$Model->primaryKey] = array('type' => 'string', 'length' => 255);
-		} elseif (!empty($this->_schema[$Model->alias][$Model->primaryKey]['type'])) {
-			if (empty($this->_schema[$Model->alias][$Model->primaryKey]['length'])) {
-				if ($this->_schema[$Model->alias][$Model->primaryKey]['type'] === 'string') {
-					$this->_schema[$Model->alias][$Model->primaryKey]['length'] = 255;
-				} elseif ($this->_schema[$Model->alias][$Model->primaryKey]['type'] === 'integer') {
-					$this->_schema[$Model->alias][$Model->primaryKey]['length'] = 11;
+		if (empty($this->_schema[$model->alias][$model->primaryKey])) {
+			$this->_schema[$model->alias][$model->primaryKey] = array('type' => 'string', 'length' => 255);
+		} elseif (!empty($this->_schema[$model->alias][$model->primaryKey]['type'])) {
+			if (empty($this->_schema[$model->alias][$model->primaryKey]['length'])) {
+				if ($this->_schema[$model->alias][$model->primaryKey]['type'] === 'string') {
+					$this->_schema[$model->alias][$model->primaryKey]['length'] = 255;
+				} elseif ($this->_schema[$model->alias][$model->primaryKey]['type'] === 'integer') {
+					$this->_schema[$model->alias][$model->primaryKey]['length'] = 11;
 				}
 			}
 		}
 
-		return $this->_schema[$Model->alias];
+		return $this->_schema[$model->alias];
 	}
 
 /**
@@ -167,7 +167,7 @@ class ElasticSource extends DataSource {
  * @return array Array of types - similar to tables in a DB
  * @author David Kullmann
  */
-	public function listSources() {
+	public function listSources($data = NULL) {
 		$sources = array();
 
 		if ($this->_listSources) {
@@ -205,7 +205,6 @@ class ElasticSource extends DataSource {
 		}
 
 		$document = array($Model->alias => array_combine($fields, $values));
-
 		if ($this->inTransaction()) {
 			return $this->addToDocument($Model, $document);
 		}
@@ -230,27 +229,30 @@ class ElasticSource extends DataSource {
  * @return mixed boolean false on failure or array of records on success
  * @author David Kullmann
  */
-	public function read(Model $Model, $queryData = array()) {
+	public function read(Model $Model, $queryData = array(), $recursive = NULL) {
 		$this->currentModel($Model);
 
-		$query = $this->generateQuery($Model, $queryData);
+		$type = isset($queryData['_type']) ? $queryData['_type'] : $Model->findQueryType;
+		$Model->findQueryType = $type;
 
+		$query = $this->generateQuery($Model, $queryData);
 		if (is_string($query)) {
 			$api = $query;
 			$query = null;
 		} else {
-			$api = $Model->findQueryType === 'count' ? '_count' : '_search';
+			$api = $type === 'count' ? '_count' : '_search';
 		}
+
 		$results = $this->get($this->getType($Model), $api, $query);
 
-
-		if($Model->findQueryType === 'count') {
+		if($type === 'count') {
 			return array(array($Model->alias => array('count' => $results)));
 		}
+
 		return $results;
 	}
 
-	public function update(Model $Model, $fields = array(), $values = array()) {
+	public function update(Model $Model, $fields = array(), $values = array(), $conditions = NULL) {
 		return $this->create($Model, $fields, $values);
 	}
 
@@ -716,8 +718,6 @@ class ElasticSource extends DataSource {
 		if (empty($query['filter'])) {
 			if (empty($query['query'])) {
 				$type = 'query';
-			} else {
-				$type = 'query_string';
 			}
 		}
 		return $type;
@@ -818,7 +818,6 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	protected function _parseKey(Model $Model, $key, $value) {
-
 		if (is_numeric($key)) {
 			if (empty($value)) {
 				return false;
@@ -906,7 +905,7 @@ class ElasticSource extends DataSource {
 					break;
 				case 'multi_field':
 				case 'string':
-					$filter = $this->term($key, $operator, $value);
+					 $filter = $this->term($key, $operator, $value);
 					 break;
 				case 'geo_point':
 					$filter = $this->geo($key, $operator, $value);
@@ -964,10 +963,15 @@ class ElasticSource extends DataSource {
 			$filters = array('and' => $filters);
 		} elseif (!empty($filters[0])) {
 			$filters = $filters[0];
-			if (!empty($filters['term']['id']) && count($filters['term']['id']) === 1) {
-				$filters['term']['id'] = $filters['term']['id'][0];
+
+			$fields = array('id', $Model->escapeField());
+			foreach ($fields as $field) {
+				if (!empty($filters['term'][$field]) && count($filters['term'][$field]) === 1) {
+					return $filters['term'][$field][0];
+				}
 			}
 		}
+
 		return $filters;
 	}
 
@@ -1178,6 +1182,10 @@ class ElasticSource extends DataSource {
 
 		$body = compact('actions', 'settings');
 
+		if (empty($body['settings'])) {
+			unset($body['settings']);
+		}
+
 		try {
 			$return = $this->{$type}(null, $api, $body);
 		} catch (Exception $e) {
@@ -1185,7 +1193,7 @@ class ElasticSource extends DataSource {
 
 			$message = $e->getMessage();
 			if (preg_match('/IndexAlreadyExistsException/', $message)) {
-				throw new Exception("ElasticSearch index '$index' already exists");
+				throw new ElasticIndexExistException("ElasticSearch index '$index' already exists");
 			} else {
 				throw $e;
 			}
@@ -1499,6 +1507,7 @@ class ElasticSource extends DataSource {
 			}
 			return $results['hits']['hits'];
 		}
+
 		if (!empty($results['_id'])) {
 			$model = $results['_source'];
 			if (empty($model[$this->currentModel->alias][$this->currentModel->primaryKey])) {
