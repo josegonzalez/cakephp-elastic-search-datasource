@@ -476,6 +476,15 @@ class ElasticSource extends DataSource {
 			$queryData['page'] = ($queryData['page'] - 1) * $queryData['limit'];
 		}
 		
+		if(isset($queryData['facets'])){
+			foreach ($queryData['facets'] as $facet => &$value) {
+				if(isset($value['facet_filter'])){
+					$value['facet_filter'] = $this->parseConditions($Model, $value['facet_filter']);
+					$value['facet_filter'] = $this->afterParseConditions($Model, $value['facet_filter']);
+				}
+			}
+		}
+
 		foreach ($queryKeys as $old => $new) {
 			$query[$new] = empty($queryData[$old]) ? null : $queryData[$old];
 		}
@@ -489,7 +498,6 @@ class ElasticSource extends DataSource {
 		if ($type !== 'query') {
 			$query = array($type => compact('query', 'filter'));
 		}
-
 
 		$query = compact('query', 'size', 'sort', 'from', 'fields', 'facets');
 				
