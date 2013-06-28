@@ -506,7 +506,6 @@ class ElasticSource extends DataSource {
 		if ($Model->findQueryType === 'count') {
 			return $query['query'];
 		}
-
 		return $query;
 	}
 	
@@ -713,8 +712,12 @@ class ElasticSource extends DataSource {
 	
 	public function term($key, $operator, $value) {
 		$type = 'term';
-		if (is_array($value) && count($value) > 1) {
-			$type = 'terms';
+		if (is_array($value)){
+			if(count($value) > 1) {
+				$type = 'terms';
+			} else {
+				$value = current($value);
+			}
 		}
 		return array($type => array($key => $value));
 	}
