@@ -6,21 +6,21 @@
   "keywords":[
     "cakephp",
     "elastic",
-    "search",
+    "search"
   ],
   "license":"MIT",
   "authors":[
     {
       "name":"David Kullman",
-      "role":"Author",
+      "role":"Author"
     },
     {
       "name":"José Lorenzo Rodríguez",
-      "role":"Contributor",
+      "role":"Contributor"
     },
     {
       "name":"Christian Winther",
-      "role":"Contributor",
+      "role":"Contributor"
     }
   ],
   "require":{
