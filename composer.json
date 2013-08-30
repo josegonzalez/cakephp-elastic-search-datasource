@@ -1,0 +1,32 @@
+{
+  "name":"dkullmann/cakephp-elastic-search-datasource",
+  "version": "0.9",
+  "description":"CakePHP Datasource and Utilities for connecting models to Elastic Search types",
+  "type":"cakephp-plugin",
+  "keywords":[
+    "cakephp",
+    "elastic",
+    "search",
+  ],
+  "license":"MIT",
+  "authors":[
+    {
+      "name":"David Kullman",
+      "role":"Author",
+    },
+    {
+      "name":"José Lorenzo Rodríguez",
+      "role":"Contributor",
+    },
+    {
+      "name":"Christian Winther",
+      "role":"Contributor",
+    }
+  ],
+  "require":{
+    "composer/installers":"*"
+  },
+  "extra": {
+    "installer-name": "Elastic"
+  }
+}
