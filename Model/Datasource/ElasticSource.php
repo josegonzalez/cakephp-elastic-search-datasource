@@ -102,6 +102,18 @@ class ElasticSource extends DataSource {
 	protected $_listSources = true;
 
 /**
+ * Elasticsearch column definition
+ *
+ * @var array
+ */
+	public $columns = array(
+		'datetime' => array('name' => 'datetime', 'format' => 'Y-m-d H:i:s', 'formatter' => 'date'),
+		'timestamp' => array('name' => 'timestamp', 'format' => 'Y-m-d H:i:s', 'formatter' => 'date'),
+		'time' => array('name' => 'time', 'format' => 'H:i:s', 'formatter' => 'date'),
+		'date' => array('name' => 'date', 'format' => 'Y-m-d', 'formatter' => 'date'),
+	);
+
+/**
  * Query log
  *
  * @var string
