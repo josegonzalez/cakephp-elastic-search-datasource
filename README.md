@@ -296,6 +296,23 @@ single query string, then use the ``query_string`` key:
 	));
 
 
+### has_parent / has_child Queries
+
+If you are writing a has_parent or has_child query, you need to replace 'type' from the 
+standard JSON query with 'model':
+
+	<?php
+	$this->Model->find('all', array(
+		'conditions' => array(
+			'has_child' => array(
+				//Maps to Elasticsearch 'type'
+				'model' => 'ChildModel',
+				'child_model_id' => $id
+			)
+		)
+	));
+
+
 ## Additional
 
 Advanced features available using the IndexableBehavior such as bound and polygonal geo location searching and sorting
