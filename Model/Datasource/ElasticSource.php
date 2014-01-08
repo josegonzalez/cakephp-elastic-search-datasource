@@ -664,7 +664,11 @@ class ElasticSource extends DataSource {
 			'facets' => array(
 				'key' => 'facets',
 				'onEmpty' => 'skip'
-			)
+			),
+			'query' => array(
+				'key' => 'query',
+				'onEmpty' => 'skip'
+			),
 		);
 
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
