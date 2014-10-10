@@ -1633,6 +1633,15 @@ class ElasticSource extends DataSource {
 	}
 
 /**
+ * Returns true to signal that the  source is connected to the datastore
+ *
+ * @return bool True
+ */
+	public function isConnected() {
+		return true;
+	}
+
+/**
  * Get the query log - support for DebugKit Toolbar
  *
  * @return void
