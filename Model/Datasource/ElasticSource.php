@@ -1117,7 +1117,7 @@ class ElasticSource extends DataSource {
 		if (!empty($mapping)) {
 			foreach ($mapping as $index => $types) {
 				if($sourcesOnly) {
-					$schema = array_merge($schema, array_keys($types));
+					$schema = array_merge($schema, array_keys($types['mappings']));
 				} else {
 					foreach ($types as $type => $models) {
 						foreach ($models['properties'] as $alias => $properties) {
