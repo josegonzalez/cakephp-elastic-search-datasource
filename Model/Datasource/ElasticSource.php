@@ -617,7 +617,7 @@ class ElasticSource extends DataSource {
 
 		if (empty($this->_type) && empty($this->_id) && $id) {
 			$this->_type = $type;
-			$this->_id   = $id;
+			$this->_id	 = $id;
 			$this->_document[$id] = array();
 		} elseif ($this->_type === $type && $id !== $this->_id && $id) {
 			$this->_document[$id] = array();
@@ -919,6 +919,7 @@ class ElasticSource extends DataSource {
 				case 'integer':
 					$value = is_array($value) ? $value : (integer)$value;
 				case 'date':
+				case 'datetime':
 					$filter = $this->range($key, $operator, $value);
 					break;
 				case 'multi_field':
@@ -1018,7 +1019,7 @@ class ElasticSource extends DataSource {
 	public function geo($key, $operator, $value) {
 		$return = array();
 		if (!is_array($value)) {
-			$this->geoDistanceRange($key, $value);
+			return $this->geoDistanceRange($key, $value);
 		}
 
 		if (isset($value['distance'])) {
@@ -1310,7 +1311,7 @@ class ElasticSource extends DataSource {
  *
  * @param Model $model The model intance to introspect to get the scrollable results
  * @param integer $pageSize as results are iterated, how large should the page be when asking Elastic Searhc for results
- *  bigger numbers make fewer requests to ElasticSearch but consume more memory and take longer to process in php
+ *	bigger numbers make fewer requests to ElasticSearch but consume more memory and take longer to process in php
  * @param string $cursorTtl Time to keep cursor results cached in Elastic Seaach (Example: '10m' for ten minutes)
  * @return ElasticScroll result iterator with all entries for an index type.
  **/
@@ -1335,7 +1336,7 @@ class ElasticSource extends DataSource {
  *
  * @param ElasticScroll $scroll Iterator with results to be copied, can be from another server.
  * @param array $options Array with following options:
- *  - toIndex: Target index name. If none provided then default configured index for this datasource will be used
+ *	- toIndex: Target index name. If none provided then default configured index for this datasource will be used
  *		leave blanck wehn oyu want to copy data from one server to the other using same index name.
  *	- toType: Type name to use for storing new documents in target index (required)
  *	- transform: A callback function that will get each document before it is stored in target index.
@@ -1384,8 +1385,8 @@ class ElasticSource extends DataSource {
 				$encode = true;
 			}
 
-			$type    = !empty($arguments[0]) ? $arguments[0] : null;
-			$api     = !empty($arguments[1]) ? $arguments[1] : null;
+			$type	 = !empty($arguments[0]) ? $arguments[0] : null;
+			$api	 = !empty($arguments[1]) ? $arguments[1] : null;
 
 			if (!empty($arguments[2])) {
 				$body = $encode ? json_encode($arguments[2]) : $arguments[2];
