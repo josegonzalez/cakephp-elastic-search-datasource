@@ -72,7 +72,11 @@ Class IndexableBehavior extends ModelBehavior {
 				}
 				foreach ($result[$key] as $field => $value) {
 					if ($field === $this->distanceField) {
-						$results[$i][$geoField]['distance'] = $value;
+						$results[$i][$geoField]['distance'] = (
+							is_array($value) && isset($value[0]) ?
+							$value[0]:
+							$value
+						);
 					}
 				}
 			}
@@ -106,10 +110,32 @@ Class IndexableBehavior extends ModelBehavior {
 		unset($query['conditions'][$latKey]);
 		unset($query['conditions'][$lngKey]);
 
-		$this->distanceField = sprintf("doc['%s.%s'].distance(%s, %s)", $alias, $geo['location'], $query['latitude'], $query['longitude']);
+		$ds = $Model->getDataSource();
+		$useScriptFields = (!empty($ds->config['useScriptFields']));
+
+		$distanceField = sprintf("doc['%s.%s'].distance(%s, %s)",
+			$alias,
+			$geo['location'],
+			$useScriptFields ? 'lat' : $query['latitude'],
+			$useScriptFields ? 'lon' : $query['longitude']
+		);
+		$this->distanceField = $distanceField;
 
 		if (empty($query['fields'])) {
-			$query['fields'] = array('_source', $this->distanceField);
+			$query['fields'] = array('_source');
+		}
+
+		if ($useScriptFields) {
+			$query['script_fields'] = array(
+				$this->distanceField => array(
+					'lang' => 'groovy',
+					'script' => $distanceField,
+					'params' => array(
+						'lat' => (float) $query['latitude'],
+						'lon' => (float) $query['longitude']
+					)
+				)
+			);
 		} else {
 			$query['fields'] = array_merge($query['fields'], (array)$this->distanceField);
 		}
@@ -215,5 +241,4 @@ Class IndexableBehavior extends ModelBehavior {
 		}
 		return explode('.', $modificationField);
 	}
-
 }

@@ -661,6 +661,10 @@ class ElasticSource extends DataSource {
 				'key' => 'fields',
 				'onEmpty' => 'skip'
 			),
+			'script_fields' => array(
+				'key' => 'script_fields',
+				'onEmpty' => 'skip'
+			),
 			'facets' => array(
 				'key' => 'facets',
 				'onEmpty' => 'skip'
@@ -718,8 +722,7 @@ class ElasticSource extends DataSource {
 			$query = array($type => compact('query', 'filter'));
 		}
 
-
-		$query = compact('query', 'size', 'sort', 'from', 'fields', 'facets');
+		$query = compact('query', 'size', 'sort', 'from', 'fields', 'script_fields', 'facets');
 
 		if ($Model->findQueryType === 'count') {
 			return $query['query'];
@@ -1401,44 +1404,41 @@ class ElasticSource extends DataSource {
 	}
 
 	public function execute($method = null, $type = null, $api = null, $data = array()) {
-			// Being called from Fixture
-			if (is_array($type) && key($type) === 'log') {
-				return true;
-			}
+		if (is_array($type) && key($type) === 'log') {
+			return true;
+		}
 
-			$path = array_filter(array($this->config['index'], $type, $api));
-			$path = '/' . implode('/', $path);
+		$path = array_filter(array($this->config['index'], $type, $api));
+		$path = '/' . implode('/', $path);
 
-			//Could contain $body and $query
-			extract($data);
+		//Could contain $body and $query
+		extract($data);
 
-			// Append "_parent" to query instead of data
-			if ($this->_parent !== null) {
-				$query['parent'] = $this->_parent;
-				$this->_parent = null;
-			}
+		// Append "_parent" to query instead of data
+		if ($this->_parent !== null) {
+			$query['parent'] = $this->_parent;
+			$this->_parent = null;
+		}
 
-			$uri = $this->_uri(compact('path', 'query'));
+		$uri = $this->_uri(compact('path', 'query'));
 
-			if (!isset($body)) {
-				$body = null;
-			}
+		if (!isset($body)) {
+			$body = null;
+		}
 
-			switch ($method) {
-				case 'get':
-					$response = call_user_func_array(array(&$this->Http, $method), array($uri, array(), compact('body')));
-					break;
-				default:
-					$response = call_user_func_array(array(&$this->Http, $method), array($uri, $body));
-			}
+		switch ($method) {
+			case 'get':
+				$response = call_user_func_array(array(&$this->Http, $method), array($uri, array(), compact('body')));
+				break;
+			default:
+				$response = call_user_func_array(array(&$this->Http, $method), array($uri, $body));
+				break;
+		}
 
-			$results = $this->_parseResponse($response);
-			$this->logQuery($method, $uri, $body, $results);
-			if (!is_string($body)) {
-				$body = json_encode($body);
-			}
+		$results = $this->_parseResponse($response);
+		$this->logQuery($method, $uri, $body, $results);
 
-			return $results;
+		return $results;
 	}
 
 /**
