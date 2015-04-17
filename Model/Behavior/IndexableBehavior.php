@@ -62,10 +62,17 @@ Class IndexableBehavior extends ModelBehavior {
 			$query = $this->parseGeoQuery($Model, $query);
 			return $query;
 		} elseif ($state === 'after') {
-			foreach ($results as &$result) {
-				foreach ($result[0] as $field => $value) {
+			$geoField = $this->settings[$Model->alias]['geoFields']['alias'];
+			foreach ($results as $i => $result) {
+				$key = null;
+				if (!isset($result[0]) && isset($result[$Model->alias])) {
+					$key = $Model->alias;
+				} elseif (isset($result[0])) {
+					$key = 0;
+				}
+				foreach ($result[$key] as $field => $value) {
 					if ($field === $this->distanceField) {
-						$result[$this->settings[$Model->alias]['geoFields']['alias']]['distance'] = $value;
+						$results[$i][$geoField]['distance'] = $value;
 					}
 				}
 			}
@@ -93,7 +100,7 @@ Class IndexableBehavior extends ModelBehavior {
 			throw new Exception('Cannot perform a geo search without longitude and latitude');
 		}
 
-		$Model->latitude  = $query['latitude']  = $query['conditions'][$latKey];
+		$Model->latitude  = $query['latitude']	= $query['conditions'][$latKey];
 		$Model->longitude = $query['longitude'] = $query['conditions'][$lngKey];
 
 		unset($query['conditions'][$latKey]);
