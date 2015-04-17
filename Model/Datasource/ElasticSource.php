@@ -1116,10 +1116,17 @@ class ElasticSource extends DataSource {
 		$schema = array();
 		if (!empty($mapping)) {
 			foreach ($mapping as $index => $types) {
+				$mappings = $types;
+				if (array_key_exists('mappings', $types)) {
+					$mappings = $types['mappings'];
+				} elseif (array_key_exists('properties', $types)) {
+					$mappings = $types['properties'];
+				}
+
 				if($sourcesOnly) {
-					$schema = array_merge($schema, array_keys($types));
+					$schema = array_merge($schema, array_keys($mappings));
 				} else {
-					foreach ($types as $type => $models) {
+					foreach ($mappings as $type => $models) {
 						foreach ($models['properties'] as $alias => $properties) {
 							if (!empty($properties['properties'])) {
 								$schema[$alias] = $properties['properties'];
@@ -1234,7 +1241,6 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function checkMapping($Model) {
-
 		if (is_string($Model)) {
 			$type = $Model;
 		} elseif ($Model instanceof Model) {
