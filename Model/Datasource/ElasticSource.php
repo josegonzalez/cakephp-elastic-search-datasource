@@ -725,7 +725,7 @@ class ElasticSource extends DataSource {
 		$query = compact('query', 'size', 'sort', 'from', 'fields', 'script_fields', 'facets');
 
 		if ($Model->findQueryType === 'count') {
-			return $query['query'];
+			return (!empty($this->config['filteredCount']) ? ['query' => $query['query']] : $query['query']);
 		}
 
 		return $query;
@@ -1731,4 +1731,3 @@ class ElasticSource extends DataSource {
 		return $table;
 	}
 }
-
