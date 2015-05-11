@@ -885,6 +885,8 @@ class ElasticSource extends DataSource {
 
 		if ($key === 'query_string') {
 			return array('query' => array('query_string' => $value));
+		} elseif ($key === 'script' && isset($value['script']) && is_array($value['script'])) {
+			return array('script' => $value['script']);
 		}
 
 		if ($key === 'has_child') {
