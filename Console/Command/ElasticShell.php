@@ -98,6 +98,7 @@ class ElasticShell extends AppShell {
 			->addArgument('model', array('help' => 'Model to use', 'required' => true))
 			->addOption('db_config', array('help' => 'DB config to use to get the schema', 'default' => 'default', 'short' => 'd'))
 			->addOption('extra', array('help' => 'Extra param for you to use, useful when overriding IndexableBehavior::lastSync()/syncConditions()','short' => 'e'))
+			->addOption('since', array('help' => 'Index records created after the given date','short' => 's', 'default' => null))
 			->addOption('limit', array('help' => 'Limit for indexing','short' => 'l', 'default' => 100))
 			->addOption('page', array('help' => 'Page to start indexing on','short' => 'p', 'default' => 1))
 			->addOption('fast', array('help' => 'Fast index (dont use saveAll)','short' => 'f', 'default' => false))
@@ -237,7 +238,6 @@ class ElasticShell extends AppShell {
 	}
 
 	public function index() {
-
 		extract($this->params);
 
 		$model = $this->args[0];
@@ -250,9 +250,13 @@ class ElasticShell extends AppShell {
 
 		list($alias, $field) = $this->Model->getModificationField();
 
-		$this->Model->setDataSource('index');
-		$date = $this->Model->lastSync($this->params);
-		$this->Model->setDataSource($db_config);
+		if (!empty($this->params['since'])) {
+			$date = date('Y-m-d H:i:s', strtotime($this->params['since']));
+		} else {
+			$this->Model->setDataSource('index');
+			$date = $this->Model->lastSync($this->params);
+			$this->Model->setDataSource($db_config);
+		}
 
 		$conditions = $this->Model->syncConditions($field, $date, $this->params);
 
@@ -272,7 +276,7 @@ class ElasticShell extends AppShell {
 		// issues w/how MySQL does pagination. This will paginate properly even
 		// if many models have the same value in the modification field
 		do {
-			if(!empty($records)) {
+			if (!empty($records)) {
 				$record = array_pop($records);
 				$newDate = $record[$alias][$field];
 				if($newDate === $date) {
@@ -289,10 +293,8 @@ class ElasticShell extends AppShell {
 			$this->_endTimer($tasks['mysql']);
 
 			if (!empty($records)) {
-
 				$this->Model->create();
 				$this->Model->setDataSource('index');
-
 				$this->_startTimer($tasks['saving']);
 				if ($fast) {
 					try {
@@ -311,13 +313,10 @@ class ElasticShell extends AppShell {
 				} else {
 					$this->out("Unable to save records (limit: $limit - page: $page)");
 				}
-
 			}
 
 			$this->Model->setDataSource($db_config);
-
 		} while (!empty($records));
-
 	}
 
 /**
