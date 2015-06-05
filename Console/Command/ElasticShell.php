@@ -307,11 +307,13 @@ class ElasticShell extends AppShell {
 				}
 				$this->_endTimer($tasks['saving']);
 
-				if ($results) {
+				if (!empty($results)) {
 					$count = count($records);
 					$this->out("Saved $count records starting on $date (page: $page - limit: $limit)");
 				} else {
 					$this->out("Unable to save records (limit: $limit - page: $page)");
+					// Prevent endless loop
+					$records = true;
 				}
 			}
 
