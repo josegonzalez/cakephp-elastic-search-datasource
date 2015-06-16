@@ -276,9 +276,13 @@ class ElasticShell extends AppShell {
 		// issues w/how MySQL does pagination. This will paginate properly even
 		// if many models have the same value in the modification field
 		do {
-			if (!empty($records) && is_array($records)) {
-				$record = array_pop($records);
-				$newDate = $record[$alias][$field];
+			if (!empty($records)) {
+				if ($records === true) {
+					$newDate = $date;
+				} else {
+					$record = array_pop($records);
+					$newDate = $record[$alias][$field];
+				}
 				if($newDate === $date) {
 					$page++;
 				} else {
