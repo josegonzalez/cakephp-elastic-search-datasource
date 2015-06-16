@@ -276,7 +276,7 @@ class ElasticShell extends AppShell {
 		// issues w/how MySQL does pagination. This will paginate properly even
 		// if many models have the same value in the modification field
 		do {
-			if (!empty($records)) {
+			if (!empty($records) && is_array($records)) {
 				$record = array_pop($records);
 				$newDate = $record[$alias][$field];
 				if($newDate === $date) {
@@ -298,7 +298,7 @@ class ElasticShell extends AppShell {
 				$this->_startTimer($tasks['saving']);
 				if ($fast) {
 					try {
-						$results = $this->Model->index($records);
+						$results = $this->Model->index($this->fixUTF8($records));
 					} catch (Exception $e) {
 						$this->out("Error: ". $e->getMessage());
 					}
@@ -319,6 +319,26 @@ class ElasticShell extends AppShell {
 
 			$this->Model->setDataSource($db_config);
 		} while (!empty($records));
+	}
+
+/**
+ * Fix UTF8 encoding errors in an array of values as they will ultimately make
+ * the ElasticSearch document empty, which produces a catastrophic error while
+ * indexing.
+ *
+ * @param array $data Data to sanitize
+ * @return array Sanitized data
+ */
+	private function fixUTF8(array $data) {
+		foreach ($data as $key => $value) {
+			if (is_array($value)) {
+				$value = $this->fixUTF8($value);
+			} elseif (is_string($value) && json_encode($value) === false && json_last_error() === JSON_ERROR_UTF8) {
+				$value = utf8_encode(utf8_decode($value));
+			}
+			$data[$key] = $value;
+		}
+		return $data;
 	}
 
 /**
