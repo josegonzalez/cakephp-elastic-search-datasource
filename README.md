@@ -1,3 +1,10 @@
+[![Build Status](https://img.shields.io/travis/josegonzalez/cakephp-elastic-search-datasource/master.svg?style=flat-square)](https://travis-ci.org/josegonzalez/cakephp-elastic-search-datasource) 
+[![Coverage Status](https://img.shields.io/coveralls/josegonzalez/cakephp-elastic-search-datasource.svg?style=flat-square)](https://coveralls.io/r/josegonzalez/cakephp-elastic-search-datasource?branch=master) 
+[![Total Downloads](https://img.shields.io/packagist/dt/josegonzalez/cakephp-elastic-search-datasource.svg?style=flat-square)](https://packagist.org/packages/josegonzalez/cakephp-elastic-search-datasource) 
+[![Latest Stable Version](https://img.shields.io/packagist/v/josegonzalez/cakephp-elastic-search-datasource.svg?style=flat-square)](https://packagist.org/packages/josegonzalez/cakephp-elastic-search-datasource) 
+[![Documentation Status](https://readthedocs.org/projects/cakephp-elastic-search-datasource/badge/?version=latest&style=flat-square)](https://readthedocs.org/projects/cakephp-elastic-search-datasource/?badge=latest)
+[![Gratipay](https://img.shields.io/gratipay/josegonzalez.svg?style=flat-square)](https://gratipay.com/~josegonzalez/)
+
 # CakePHP Elastic Plugin & ElasticSearch "ElasticSource" Datasource
 
 Conveniently index and access records in ElasticSearch.
