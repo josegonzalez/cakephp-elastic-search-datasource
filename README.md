@@ -26,7 +26,7 @@ Patches and issues welcome. Please include unit tests.
 
 _[Manual]_
 
-* Download this: http://github.com/dkullmann/CakePHP-Elastic-Search-DataSource/zipball/master
+* Download this: http://github.com/josegonzalez/cakephp-elastic-search-datasource/zipball/master
 * Unzip that download.
 * Copy the resulting folder to app/Plugin
 * Rename the folder you just copied to Elastic
@@ -35,14 +35,14 @@ _[GIT Submodule]_
 
 In your app directory type:
 
-	git submodule add git://github.com/dkullmann/CakePHP-Elastic-Search-DataSource.git Plugin/Elastic
+	git submodule add git://github.com/josegonzalez/cakephp-elastic-search-datasource.git Plugin/Elastic
 	git submodule update --init
 
 _[GIT Clone]_
 
 In your app directory type
 
-	git clone git://github.com/dkullmann/CakePHP-Elastic-Search-DataSource.git Plugin/Elastic
+	git clone git://github.com/josegonzalez/cakephp-elastic-search-datasource.git Plugin/Elastic
 
 ### Enable plugin
 
